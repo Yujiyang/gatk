@@ -30,7 +30,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     public void testCohort() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
         Arrays.stream(testCountFiles).forEach(argsBuilder::addInput);
-        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.CONTIG_PLOIDY_PRIORS_FILE_LONG_NAME,
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME,
                 testContigPloidyPriorFile)
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, tempOutputDir.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
@@ -63,7 +63,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
         Arrays.stream(testCountFiles).forEach(argsBuilder::addInput);
         argsBuilder.addInput(testCountFiles[0]);  //duplicate
-        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.CONTIG_PLOIDY_PRIORS_FILE_LONG_NAME,
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME,
                 testContigPloidyPriorFile)
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, tempOutputDir.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
@@ -91,7 +91,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
         Arrays.stream(testCountFiles, 0, 5).forEach(argsBuilder::addInput);
         argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, tempOutputDir.getAbsolutePath())
-                .addFileArgument(DetermineGermlineContigPloidy.CONTIG_PLOIDY_PRIORS_FILE_LONG_NAME,
+                .addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME,
                         testContigPloidyPriorFile)
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-case")
                 .addArgument(CopyNumberStandardArgument.MODEL_LONG_NAME,

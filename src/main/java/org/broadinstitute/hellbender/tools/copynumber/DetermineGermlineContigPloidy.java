@@ -180,7 +180,7 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
     public static final String MODEL_PATH_SUFFIX = "-model";
     public static final String CALLS_PATH_SUFFIX = "-calls";
 
-    public static final String CONTIG_PLOIDY_PRIORS_FILE_LONG_NAME = "contig-ploidy-priors";
+    public static final String PLOIDY_STATE_PRIORS_FILE_LONG_NAME = "ploidy-state-priors";
 
     @Argument(
             doc = "Input read-count files containing integer read counts in genomic intervals for all samples.  " +
@@ -193,12 +193,12 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
     private List<File> inputReadCountFiles = new ArrayList<>();
 
     @Argument(
-            doc = "Input file specifying contig-ploidy priors.  If only a single sample is specified, this input should not be provided.  " +
+            doc = "Input file specifying ploidy-state priors.  If only a single sample is specified, this input should not be provided.  " +
                     "If multiple samples are specified, this input is required.",
-            fullName = CONTIG_PLOIDY_PRIORS_FILE_LONG_NAME,
+            fullName = PLOIDY_STATE_PRIORS_FILE_LONG_NAME,
             optional = true
     )
-    private File inputContigPloidyPriorsFile;
+    private File inputPloidyStatePriorsFile;
 
     @Argument(
             doc = "Input ploidy-model directory.  If only a single sample is specified, this input is required.  " +
@@ -285,7 +285,7 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
             logger.info("A contig-ploidy model was provided, running in case mode...");
             Utils.validateArg(new File(inputModelDir).exists(),
                     String.format("Input ploidy-model directory %s does not exist.", inputModelDir));
-            if (inputContigPloidyPriorsFile != null) {
+            if (inputPloidyStatePriorsFile != null) {
                 throw new UserException.BadInput("Invalid combination of inputs: Running in case mode, " +
                         "but contig-ploidy priors were provided.");
             }
@@ -296,10 +296,10 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
                 throw new UserException.BadInput("Invalid combination of inputs: Running in cohort mode, " +
                         "but only a single sample was provided.");
             }
-            if (inputContigPloidyPriorsFile == null){
+            if (inputPloidyStatePriorsFile == null){
                 throw new UserException.BadInput("Contig-ploidy priors must be provided in cohort mode.");
             }
-            IOUtils.canReadFile(inputContigPloidyPriorsFile);
+            IOUtils.canReadFile(inputPloidyStatePriorsFile);
         }
     }
 
@@ -356,7 +356,7 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         if (runMode == RunMode.COHORT) {
             script = COHORT_DETERMINE_PLOIDY_AND_DEPTH_PYTHON_SCRIPT;
             arguments.add("--interval_list=" + intervalsFile.getAbsolutePath());
-            arguments.add("--contig_ploidy_prior_table=" + inputContigPloidyPriorsFile.getAbsolutePath());
+            arguments.add("--contig_ploidy_prior_table=" + inputPloidyStatePriorsFile.getAbsolutePath());
             arguments.add("--output_model_path=" + outputDirArg + outputPrefix + MODEL_PATH_SUFFIX);
         } else {
             script = CASE_DETERMINE_PLOIDY_AND_DEPTH_PYTHON_SCRIPT;
