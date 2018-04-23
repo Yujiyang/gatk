@@ -16,12 +16,13 @@ import org.broadinstitute.hellbender.tools.copynumber.formats.collections.Simple
 import org.broadinstitute.hellbender.tools.copynumber.formats.collections.SimpleIntervalCollection;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.LocatableMetadata;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.SimpleLocatableMetadata;
-import org.broadinstitute.hellbender.tools.copynumber.formats.records.CoveragePerContig;
+import org.broadinstitute.hellbender.tools.copynumber.formats.records.ContigToCoverageDistributionMap;
 import org.broadinstitute.hellbender.tools.copynumber.formats.records.SimpleCount;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.io.IOUtils;
 import org.broadinstitute.hellbender.utils.io.Resource;
+import org.broadinstitute.hellbender.utils.param.ParamUtils;
 import org.broadinstitute.hellbender.utils.python.PythonScriptExecutor;
 
 import java.io.File;
@@ -181,6 +182,7 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
     public static final String CALLS_PATH_SUFFIX = "-calls";
 
     public static final String PLOIDY_STATE_PRIORS_FILE_LONG_NAME = "ploidy-state-priors";
+    public static final String MAXIMUM_COUNT_LONG_NAME = "maximum-count";
 
     @Argument(
             doc = "Input read-count files containing integer read counts in genomic intervals for all samples.  " +
@@ -222,6 +224,14 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
     )
     private String outputDir;
 
+    @Argument(
+            doc = "Maximum count to use in constructing coverage distributions.",
+            fullName = MAXIMUM_COUNT_LONG_NAME,
+            minValue = 0,
+            optional = true
+    )
+    private int maximumCount = 250;
+
     @Advanced
     @ArgumentCollection
     private GermlineContigPloidyModelArgumentCollection germlineContigPloidyModelArgumentCollection =
@@ -252,16 +262,16 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         final SAMSequenceDictionary sequenceDictionary = firstReadCounts.getMetadata().getSequenceDictionary();
         final List<SimpleInterval> intervals = firstReadCounts.getIntervals();
 
-        //read in count files and output intervals and samples x coverage-per-contig table to temporary files
+        //read in count files and output intervals and samples x contig x coverage distribution table to temporary files
         final File intervalsFile = IOUtils.createTempFile("intervals", ".tsv");
         final LocatableMetadata metadata = new SimpleLocatableMetadata(sequenceDictionary);
         new SimpleIntervalCollection(metadata, intervals).write(intervalsFile);
-        final File samplesByCoveragePerContigFile = IOUtils.createTempFile("samples-by-coverage-per-contig", ".tsv");
-        writeSamplesByCoveragePerContig(samplesByCoveragePerContigFile, metadata, intervals);
+        final File samplesByContigByCoverageDistributionFile = IOUtils.createTempFile("samples-by-contig-by-coverage-distribution", ".tsv");
+        writeSamplesByContigByCoverageDistribution(samplesByContigByCoverageDistributionFile, metadata, intervals);
 
         //call python inference code
         final boolean pythonReturnCode = executeDeterminePloidyAndDepthPythonScript(
-                samplesByCoveragePerContigFile, intervalsFile);
+                samplesByContigByCoverageDistributionFile, intervalsFile);
 
         if (!pythonReturnCode) {
             throw new UserException("Python return code was non-zero.");
@@ -276,6 +286,7 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         germlineContigPloidyModelArgumentCollection.validate();
         germlineContigPloidyHybridADVIArgumentCollection.validate();
         Utils.nonNull(outputPrefix);
+        ParamUtils.isPositiveOrZero(maximumCount, "Maximum count must be non-negative.");
         inputReadCountFiles.forEach(IOUtils::canReadFile);
         Utils.validateArg(inputReadCountFiles.size() == new HashSet<>(inputReadCountFiles).size(),
                 "List of input read-count files cannot contain duplicates.");
@@ -303,12 +314,12 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         }
     }
 
-    private void writeSamplesByCoveragePerContig(final File samplesByCoveragePerContigFile,
-                                                 final LocatableMetadata metadata,
-                                                 final List<SimpleInterval> intervals) {
+    private void writeSamplesByContigByCoverageDistribution(final File samplesByCoveragePerContigFile,
+                                                            final LocatableMetadata metadata,
+                                                            final List<SimpleInterval> intervals) {
         logger.info("Validating and aggregating coverage per contig from input read-count files...");
         final int numSamples = inputReadCountFiles.size();
-        final List<CoveragePerContig> coveragePerContigs = new ArrayList<>(numSamples);
+        final List<ContigToCoverageDistributionMap> contigToCoverageDistributionMaps = new ArrayList<>(numSamples);
         final List<String> contigs = intervals.stream().map(SimpleInterval::getContig).distinct()
                 .collect(Collectors.toList());
         final ListIterator<File> inputReadCountFilesIterator = inputReadCountFiles.listIterator();
@@ -326,16 +337,12 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
             Utils.validateArg(readCounts.getIntervals().equals(intervals),
                     String.format("Intervals for read-count file %s do not match those in other " +
                             "read-count files.", inputReadCountFile));
-            //calculate coverage per contig and construct record for each sample
-            coveragePerContigs.add(new CoveragePerContig(
-                    readCounts.getMetadata().getSampleName(),
-                    readCounts.getRecords().stream()
-                            .collect(Collectors.groupingBy(
-                                    SimpleCount::getContig,
-                                    LinkedHashMap::new,
-                                    Collectors.summingInt(SimpleCount::getCount)))));
+            //calculate coverage distribution per contig and construct record for each sample
+            contigToCoverageDistributionMaps.add(new ContigToCoverageDistributionMap(
+                    readCounts,
+                    maximumCount));
         }
-        new CoveragePerContigCollection(metadata, coveragePerContigs, contigs)
+        new CoveragePerContigCollection(metadata, contigToCoverageDistributionMaps, contigs)
                 .write(samplesByCoveragePerContigFile);
     }
 

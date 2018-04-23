@@ -6,7 +6,6 @@ import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.param.ParamUtils;
 
 import java.io.Serializable;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -18,20 +17,20 @@ import java.util.List;
 public final class GermlineContigPloidyModelArgumentCollection implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    public static final String PLOIDY_CONCENTRATION_SCALE = "ploidy-concentration-scale";
+    public static final String PLOIDY_CONCENTRATION_SCALE_LONG_NAME = "ploidy-concentration-scale";
     public static final String ERROR_RATE_UPPER_BOUND_LONG_NAME = "error-rate-upper-bound";
     public static final String CONTIG_BIAS_LOWER_BOUND_LONG_NAME = "contig-bias-lower-bound";
     public static final String CONTIG_BIAS_UPPER_BOUND_LONG_NAME = "contig-bias-upper-bound";
-    public static final String CONTIG_BIAS_SCALE = "contig-bias-scale";
+    public static final String CONTIG_BIAS_SCALE_LONG_NAME = "contig-bias-scale";
     public static final String MOSAICISM_BIAS_LOWER_BOUND_LONG_NAME = "mosaicism-bias-lower-bound";
     public static final String MOSAICISM_BIAS_UPPER_BOUND_LONG_NAME = "mosaicism-bias-upper-bound";
-    public static final String MOSAICISM_BIAS_SCALE = "mosaicism-bias-scale";
+    public static final String MOSAICISM_BIAS_SCALE_LONG_NAME = "mosaicism-bias-scale";
 
     @Argument(
             doc = "Scaling factor for the concentration parameters of the per-contig-set Dirichlet prior on ploidy states.  " +
                     "The relative probabilities given by the ploidy-state priors are normalized and multiplied by this factor " +
                     "to yield the concentration parameters.",
-            fullName = PLOIDY_CONCENTRATION_SCALE,
+            fullName = PLOIDY_CONCENTRATION_SCALE_LONG_NAME,
             minValue = 0.,
             optional = true
     )
@@ -64,7 +63,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
     @Argument(
             doc = "Scaling factor for the Gamma prior on the per-contig bias.  " +
                     "Both alpha and beta hyperparameters for the Gamma prior will be set to this factor.",
-            fullName = CONTIG_BIAS_SCALE,
+            fullName = CONTIG_BIAS_SCALE_LONG_NAME,
             minValue = 0.,
             optional = true
     )
@@ -88,7 +87,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
 
     @Argument(
             doc = "Standard deviation of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
-            fullName = MOSAICISM_BIAS_SCALE,
+            fullName = MOSAICISM_BIAS_SCALE_LONG_NAME,
             minValue = 0.,
             optional = true
     )
