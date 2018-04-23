@@ -11,13 +11,11 @@ import org.broadinstitute.hellbender.tools.copynumber.arguments.CopyNumberArgume
 import org.broadinstitute.hellbender.tools.copynumber.arguments.CopyNumberStandardArgument;
 import org.broadinstitute.hellbender.tools.copynumber.arguments.GermlineContigPloidyHybridADVIArgumentCollection;
 import org.broadinstitute.hellbender.tools.copynumber.arguments.GermlineContigPloidyModelArgumentCollection;
-import org.broadinstitute.hellbender.tools.copynumber.formats.collections.CoveragePerContigCollection;
 import org.broadinstitute.hellbender.tools.copynumber.formats.collections.SimpleCountCollection;
 import org.broadinstitute.hellbender.tools.copynumber.formats.collections.SimpleIntervalCollection;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.LocatableMetadata;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.SimpleLocatableMetadata;
-import org.broadinstitute.hellbender.tools.copynumber.formats.records.ContigToCoverageDistributionMap;
-import org.broadinstitute.hellbender.tools.copynumber.formats.records.SimpleCount;
+import org.broadinstitute.hellbender.tools.copynumber.formats.collections.ContigCountDistributionCollection;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.io.IOUtils;
@@ -319,7 +317,7 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
                                                             final List<SimpleInterval> intervals) {
         logger.info("Validating and aggregating coverage per contig from input read-count files...");
         final int numSamples = inputReadCountFiles.size();
-        final List<ContigToCoverageDistributionMap> contigToCoverageDistributionMaps = new ArrayList<>(numSamples);
+        final List<ContigCountDistributionCollection> contigCountDistributionCollections = new ArrayList<>(numSamples);
         final List<String> contigs = intervals.stream().map(SimpleInterval::getContig).distinct()
                 .collect(Collectors.toList());
         final ListIterator<File> inputReadCountFilesIterator = inputReadCountFiles.listIterator();
@@ -338,12 +336,12 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
                     String.format("Intervals for read-count file %s do not match those in other " +
                             "read-count files.", inputReadCountFile));
             //calculate coverage distribution per contig and construct record for each sample
-            contigToCoverageDistributionMaps.add(new ContigToCoverageDistributionMap(
+            contigCountDistributionCollections.add(new ContigCountDistributionCollection(
                     readCounts,
                     maximumCount));
         }
-        new CoveragePerContigCollection(metadata, contigToCoverageDistributionMaps, contigs)
-                .write(samplesByCoveragePerContigFile);
+//        new CoveragePerContigCollection(metadata, contigCountDistributionCollections, contigs)
+//                .write(samplesByCoveragePerContigFile);
     }
 
     private boolean executeDeterminePloidyAndDepthPythonScript(final File samplesByCoveragePerContigFile,
