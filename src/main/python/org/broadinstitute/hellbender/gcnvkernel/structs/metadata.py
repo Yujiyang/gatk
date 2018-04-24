@@ -52,10 +52,10 @@ class SampleCoverageMetadata:
 
     def __init__(self,
                  sample_name: str,
-                 n_j: np.ndarray,
+                 n_jm: np.ndarray,
                  contig_list: List[str]):
-        assert n_j.ndim == 1
-        assert n_j.size == len(contig_list)
+        assert n_jm.ndim == 2
+        assert n_jm.size[0] == len(contig_list)
 
         self.sample_name = sample_name
         self.contig_list = contig_list

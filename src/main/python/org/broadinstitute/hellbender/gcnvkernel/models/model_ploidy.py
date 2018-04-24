@@ -20,9 +20,9 @@ _logger = logging.getLogger(__name__)
 
 
 class PloidyModelConfig:
-    """Germline contig ploidy model hyper-parameters."""
+    """Germline contig-ploidy-model hyperparameters."""
     def __init__(self,
-                 contig_ploidy_prior_map: Dict[str, np.ndarray] = None,
+                 ploidy_state_priors_map: Dict[tuple, float] = None,
                  mean_bias_sd: float = 1e-2,
                  psi_j_scale: float = 1e-3,
                  psi_s_scale: float = 1e-4,
@@ -30,19 +30,19 @@ class PloidyModelConfig:
         """Initializer.
 
         Args:
-            contig_ploidy_prior_map: map from contigs to prior probabilities of each ploidy state
+            ploidy_state_priors_map: map from contigs to prior probabilities of each ploidy state
             mean_bias_sd: standard deviation of mean contig-level coverage bias
             psi_j_scale: typical scale of contig-specific unexplained variance
             psi_s_scale: typical scale of sample-specific unexplained variance
             mapping_error_rate: typical mapping error probability
         """
-        assert contig_ploidy_prior_map is not None
+        assert ploidy_state_priors_map is not None
         self.mean_bias_sd = mean_bias_sd
         self.psi_j_scale = psi_j_scale
         self.psi_s_scale = psi_s_scale
         self.mapping_error_rate = mapping_error_rate
-        self.contig_ploidy_prior_map, self.num_ploidy_states = self._get_validated_contig_ploidy_prior_map(
-            contig_ploidy_prior_map)
+        self.ploidy_state_priors_map, self.num_ploidy_states = self._get_validated_contig_ploidy_prior_map(
+            ploidy_state_priors_map)
         self.contig_set = set(contig_ploidy_prior_map.keys())
         self.unordered_contig_list = list(self.contig_set)
 
