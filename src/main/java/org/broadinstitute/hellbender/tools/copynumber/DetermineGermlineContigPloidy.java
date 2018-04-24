@@ -260,16 +260,16 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         final SAMSequenceDictionary sequenceDictionary = firstReadCounts.getMetadata().getSequenceDictionary();
         final List<SimpleInterval> intervals = firstReadCounts.getIntervals();
 
-        //read in count files and output intervals and samples x contig x coverage distribution table to temporary files
+        //read in count files and output intervals and contig x count distribution collections to temporary files
         final File intervalsFile = IOUtils.createTempFile("intervals", ".tsv");
         final LocatableMetadata metadata = new SimpleLocatableMetadata(sequenceDictionary);
         new SimpleIntervalCollection(metadata, intervals).write(intervalsFile);
-        final File samplesByContigByCoverageDistributionFile = IOUtils.createTempFile("samples-by-contig-by-coverage-distribution", ".tsv");
-        writeSamplesByContigByCoverageDistribution(samplesByContigByCoverageDistributionFile, metadata, intervals);
+        final File contigCountDistributionCollectionsDir = IOUtils.tempDir("contig-count-distribution-collections", "");
+        writeContigCountDistributionCollections(contigCountDistributionCollectionsDir, metadata, intervals);
 
         //call python inference code
         final boolean pythonReturnCode = executeDeterminePloidyAndDepthPythonScript(
-                samplesByContigByCoverageDistributionFile, intervalsFile);
+                contigCountDistributionCollectionsDir, intervalsFile);
 
         if (!pythonReturnCode) {
             throw new UserException("Python return code was non-zero.");
@@ -312,14 +312,11 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         }
     }
 
-    private void writeSamplesByContigByCoverageDistribution(final File samplesByCoveragePerContigFile,
-                                                            final LocatableMetadata metadata,
-                                                            final List<SimpleInterval> intervals) {
-        logger.info("Validating and aggregating coverage per contig from input read-count files...");
+    private void writeContigCountDistributionCollections(final File contigCountDistributionCollectionsDir,
+                                                         final LocatableMetadata metadata,
+                                                         final List<SimpleInterval> intervals) {
+        logger.info("Validating and aggregating per-contig count distributions from input read-count files...");
         final int numSamples = inputReadCountFiles.size();
-        final List<ContigCountDistributionCollection> contigCountDistributionCollections = new ArrayList<>(numSamples);
-        final List<String> contigs = intervals.stream().map(SimpleInterval::getContig).distinct()
-                .collect(Collectors.toList());
         final ListIterator<File> inputReadCountFilesIterator = inputReadCountFiles.listIterator();
         while (inputReadCountFilesIterator.hasNext()) {
             final int sampleIndex = inputReadCountFilesIterator.nextIndex();
@@ -335,24 +332,20 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
             Utils.validateArg(readCounts.getIntervals().equals(intervals),
                     String.format("Intervals for read-count file %s do not match those in other " +
                             "read-count files.", inputReadCountFile));
-            //calculate coverage distribution per contig and construct record for each sample
-            contigCountDistributionCollections.add(new ContigCountDistributionCollection(
-                    readCounts,
-                    maximumCount));
+            //calculate per-contig count distributions and write temporary file for this sample
+            new ContigCountDistributionCollection(readCounts, maximumCount)
+                    .write(new File(contigCountDistributionCollectionsDir, String.format("SAMPLE-%d", sampleIndex)));
         }
-//        new CoveragePerContigCollection(metadata, contigCountDistributionCollections, contigs)
-//                .write(samplesByCoveragePerContigFile);
     }
 
-    private boolean executeDeterminePloidyAndDepthPythonScript(final File samplesByCoveragePerContigFile,
+    private boolean executeDeterminePloidyAndDepthPythonScript(final File contigCountDistributionCollectionsDir,
                                                                final File intervalsFile) {
         final PythonScriptExecutor executor = new PythonScriptExecutor(true);
         final String outputDirArg = Utils.nonEmpty(outputDir).endsWith(File.separator)
                 ? outputDir
                 : outputDir + File.separator;    //add trailing slash if necessary
-        //note that the samples x coverage-by-contig table is referred to as "metadata" by gcnvkernel
         final List<String> arguments = new ArrayList<>(Arrays.asList(
-                "--sample_coverage_metadata=" + samplesByCoveragePerContigFile.getAbsolutePath(),
+                "--contig_count_distribution_collections_path=" + contigCountDistributionCollectionsDir.getAbsolutePath(),
                 "--output_calls_path=" + outputDirArg + outputPrefix + CALLS_PATH_SUFFIX));
         arguments.addAll(germlineContigPloidyModelArgumentCollection.generatePythonArguments(runMode));
         arguments.addAll(germlineContigPloidyHybridADVIArgumentCollection.generatePythonArguments());

@@ -30,8 +30,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     public void testCohort() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
         Arrays.stream(testCountFiles).forEach(argsBuilder::addInput);
-        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME,
-                testContigPloidyPriorFile)
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, testContigPloidyPriorFile)
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, tempOutputDir.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");

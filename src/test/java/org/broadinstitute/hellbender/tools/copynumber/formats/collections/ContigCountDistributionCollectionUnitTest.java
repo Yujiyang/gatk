@@ -5,9 +5,11 @@ import htsjdk.samtools.SAMSequenceRecord;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.SimpleSampleLocatableMetadata;
 import org.broadinstitute.hellbender.tools.copynumber.formats.records.SimpleCount;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
+import org.broadinstitute.hellbender.utils.io.IOUtils;
 import org.testng.Assert;
 import org.testng.annotations.Test;
 
+import java.io.File;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -62,5 +64,9 @@ public final class ContigCountDistributionCollectionUnitTest {
         Assert.assertEquals(result.getMaximumCount(), maximumCount);
         result.getRecords().forEach(
                 ccd -> Assert.assertEquals(ccd.getCountDistribution(), countDistributionExpected));
+
+        final File outputFile = IOUtils.createTempFile("contig-count-distribution", "tsv");
+        result.write(outputFile);
+        Assert.assertTrue(outputFile.exists());
     }
 }

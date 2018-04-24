@@ -42,7 +42,9 @@ public final class ContigCountDistributionCollection extends AbstractRecordColle
 
     private static final BiConsumer<ContigCountDistribution, DataLine> CONTIG_COUNT_DISTRIBUTION_RECORD_TO_DATA_LINE_ENCODER = (contigCountDistribution, dataLine) -> {
         dataLine.append(contigCountDistribution.getContig());
-        contigCountDistribution.getCountDistribution().forEach(dataLine::set);
+        contigCountDistribution.getCountDistribution().forEach(
+                (i, occurrences) -> dataLine.set(String.valueOf(i), occurrences)
+        );
     };
 
     public ContigCountDistributionCollection(final SampleLocatableMetadata metadata,
