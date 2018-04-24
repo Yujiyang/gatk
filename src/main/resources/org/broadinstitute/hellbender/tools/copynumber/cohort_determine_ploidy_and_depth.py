@@ -7,7 +7,7 @@ import argparse
 import gcnvkernel
 import shutil
 
-parser = argparse.ArgumentParser(description="gCNV contig ploidy and read depth determination tool",
+parser = argparse.ArgumentParser(description="gCNV contig ploidy and read-depth determination tool",
                                  formatter_class=gcnvkernel.cli_commons.GCNVHelpFormatter)
 
 # logging args
@@ -22,23 +22,23 @@ group.add_argument("--interval_list",
                    default=argparse.SUPPRESS,
                    help="Interval list of included genomic regions in the analysis (in .tsv format)")
 
-group.add_argument("--sample_coverage_metadata",
+group.add_argument("--contig_count_distribution_collections_path",
                    type=str,
                    required=True,
                    default=argparse.SUPPRESS,
-                   help="Coverage metadata of all samples (in .tsv format)")
+                   help="Path containing per-contig count-distribution files for all samples (in .tsv format)")
 
-group.add_argument("--contig_ploidy_prior_table",
+group.add_argument("--ploidy_state_priors_table",
                    type=str,
                    required=True,
                    default=argparse.SUPPRESS,
-                   help="Contig ploidy prior probabilities (in .tsv format)")
+                   help="Ploidy-state prior probabilities (in .tsv format)")
 
 group.add_argument("--output_model_path",
                    type=str,
                    required=True,
                    default=argparse.SUPPRESS,
-                   help="Output path to write the ploidy model for future case-sample ploidy determination use")
+                   help="Output path to write the ploidy model for future case-sample ploidy determination")
 
 group.add_argument("--output_calls_path",
                    type=str,

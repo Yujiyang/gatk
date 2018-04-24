@@ -9,6 +9,8 @@ import org.testng.annotations.Test;
 
 import java.io.File;
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
 /**
@@ -18,20 +20,20 @@ import java.util.stream.IntStream;
  *
  */
 public final class DetermineGermlineContigPloidyIntegrationTest extends CommandLineProgramTest {
-    private static final String gCNVSimDataDir = toolsTestDir + "copynumber/gcnv-sim-data/";
-    private static final File testContigPloidyPriorFile =
-            new File(gCNVSimDataDir, "contig_ploidy_prior.tsv");
-    private static final File[] testCountFiles = IntStream.range(0, 20)
-            .mapToObj(n -> new File(gCNVSimDataDir, String.format("SAMPLE_%03d_counts.tsv", n)))
-            .toArray(File[]::new);
-    private final File tempOutputDir = createTempDir("test-ploidy");
+    private static final String SIMULATED_DATA_DIR = toolsTestDir + "copynumber/gcnv-sim-data/";
+    private static final File PLOIDY_STATE_PRIORS_FILE =
+            new File(SIMULATED_DATA_DIR, "ploidy_state_priors.tsv");
+    private static final List<File> COUNT_FILES = IntStream.range(0, 20)
+            .mapToObj(n -> new File(SIMULATED_DATA_DIR, String.format("SAMPLE_%03d_counts.tsv", n)))
+            .collect(Collectors.toList());
+    private static final File OUTPUT_DIR = createTempDir("test-ploidy");
 
     @Test(groups = {"python"})
     public void testCohort() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        Arrays.stream(testCountFiles).forEach(argsBuilder::addInput);
-        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, testContigPloidyPriorFile)
-                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, tempOutputDir.getAbsolutePath())
+        COUNT_FILES.forEach(argsBuilder::addInput);
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
+                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
@@ -40,8 +42,8 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     @Test(groups = {"python"}, expectedExceptions = UserException.BadInput.class)
     public void testCohortWithoutContigPloidyPriors() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        Arrays.stream(testCountFiles).forEach(argsBuilder::addInput);
-        argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, tempOutputDir.getAbsolutePath())
+        COUNT_FILES.forEach(argsBuilder::addInput);
+        argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
@@ -50,8 +52,8 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     @Test(groups = {"python"}, expectedExceptions = UserException.BadInput.class)
     public void testCohortWithSingleSample() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        argsBuilder.addInput(testCountFiles[0]);
-        argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, tempOutputDir.getAbsolutePath())
+        argsBuilder.addInput(COUNT_FILES.get(0));
+        argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
@@ -60,11 +62,10 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     @Test(groups = {"python"}, expectedExceptions = IllegalArgumentException.class)
     public void testCohortDuplicateFiles() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        Arrays.stream(testCountFiles).forEach(argsBuilder::addInput);
-        argsBuilder.addInput(testCountFiles[0]);  //duplicate
-        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME,
-                testContigPloidyPriorFile)
-                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, tempOutputDir.getAbsolutePath())
+        COUNT_FILES.forEach(argsBuilder::addInput);
+        argsBuilder.addInput(COUNT_FILES.get(0));  //duplicate
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
+                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
@@ -76,11 +77,11 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     @Test(groups = {"python"}, dependsOnMethods = "testCohort")
     public void testCase() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        Arrays.stream(testCountFiles, 0, 5).forEach(argsBuilder::addInput);
-        argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, tempOutputDir.getAbsolutePath())
+        COUNT_FILES.subList(0, 5).forEach(argsBuilder::addInput);
+        argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-case")
                 .addArgument(CopyNumberStandardArgument.MODEL_LONG_NAME,
-                        new File(tempOutputDir, "test-ploidy-cohort-model").getAbsolutePath())
+                        new File(OUTPUT_DIR, "test-ploidy-cohort-model").getAbsolutePath())
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -88,13 +89,12 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     @Test(groups = {"python"}, dependsOnMethods = "testCohort", expectedExceptions = UserException.BadInput.class)
     public void testCaseWithContigPloidyPrior() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        Arrays.stream(testCountFiles, 0, 5).forEach(argsBuilder::addInput);
-        argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, tempOutputDir.getAbsolutePath())
-                .addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME,
-                        testContigPloidyPriorFile)
+        COUNT_FILES.subList(0, 5).forEach(argsBuilder::addInput);
+        argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
+                .addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-case")
                 .addArgument(CopyNumberStandardArgument.MODEL_LONG_NAME,
-                        new File(tempOutputDir, "test-ploidy-cohort-model").getAbsolutePath())
+                        new File(OUTPUT_DIR, "test-ploidy-cohort-model").getAbsolutePath())
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }

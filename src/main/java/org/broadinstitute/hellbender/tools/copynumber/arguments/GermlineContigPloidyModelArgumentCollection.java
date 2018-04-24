@@ -96,14 +96,14 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
     public List<String> generatePythonArguments(final DetermineGermlineContigPloidy.RunMode runMode) {
         if (runMode == DetermineGermlineContigPloidy.RunMode.COHORT) {
             return Arrays.asList(
-                    String.format("--ploidy-concentration-scale=%e", ploidyConcentrationScale),
-                    String.format("--error-rate-upper-bound=%e", errorRateUpperBound),
-                    String.format("--contig-bias-lower-bound=%e", contigBiasLowerBound),
-                    String.format("--contig-bias-upper-bound=%e", contigBiasUpperBound),
-                    String.format("--contig-bias-scale=%e", contigBiasScale),
-                    String.format("--mosaicism-bias-lower-bound=%e", mosaicismBiasLowerBound),
-                    String.format("--mosaicism-bias-upper-bound=%e", mosaicismBiasUpperBound),
-                    String.format("--mosaicism-bias-scale=%e", mosaicismBiasScale));
+                    String.format("--ploidy_concentration_scale=%e", ploidyConcentrationScale),
+                    String.format("--error_rate_upper_bound=%e", errorRateUpperBound),
+                    String.format("--contig_bias_lower_bound=%e", contigBiasLowerBound),
+                    String.format("--contig_bias_upper_bound=%e", contigBiasUpperBound),
+                    String.format("--contig_bias_scale=%e", contigBiasScale),
+                    String.format("--mosaicism_bias_lower_bound=%e", mosaicismBiasLowerBound),
+                    String.format("--mosaicism_bias_upper_bound=%e", mosaicismBiasUpperBound),
+                    String.format("--mosaicism_bias_scale=%e", mosaicismBiasScale));
         }
         return Collections.emptyList();
     }

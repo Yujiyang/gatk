@@ -354,7 +354,7 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         if (runMode == RunMode.COHORT) {
             script = COHORT_DETERMINE_PLOIDY_AND_DEPTH_PYTHON_SCRIPT;
             arguments.add("--interval_list=" + intervalsFile.getAbsolutePath());
-            arguments.add("--contig_ploidy_prior_table=" + inputPloidyStatePriorsFile.getAbsolutePath());
+            arguments.add("--ploidy_state_priors_table=" + inputPloidyStatePriorsFile.getAbsolutePath());
             arguments.add("--output_model_path=" + outputDirArg + outputPrefix + MODEL_PATH_SUFFIX);
         } else {
             script = CASE_DETERMINE_PLOIDY_AND_DEPTH_PYTHON_SCRIPT;

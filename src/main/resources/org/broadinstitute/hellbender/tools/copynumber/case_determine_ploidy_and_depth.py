@@ -6,7 +6,7 @@ os.environ["THEANO_FLAGS"] = "device=cpu,floatX=float64,optimizer=fast_run,compu
 import argparse
 import gcnvkernel
 
-parser = argparse.ArgumentParser(description="gCNV contig ploidy and read depth determination tool",
+parser = argparse.ArgumentParser(description="gCNV contig ploidy and read-depth determination tool",
                                  formatter_class=gcnvkernel.cli_commons.GCNVHelpFormatter)
 
 # logging args
@@ -15,17 +15,17 @@ gcnvkernel.cli_commons.add_logging_args_to_argparse(parser)
 # add tool-specific args
 group = parser.add_argument_group(title="Required arguments")
 
-group.add_argument("--sample_coverage_metadata",
+group.add_argument("--contig_count_distribution_collections_path",
                    type=str,
                    required=True,
                    default=argparse.SUPPRESS,
-                   help="Coverage metadata of all samples (in .tsv format)")
+                   help="Path containing per-contig count-distribution files for all samples (in .tsv format)")
 
 group.add_argument("--input_model_path",
                    type=str,
                    required=True,
                    default=argparse.SUPPRESS,
-                   help="Path to ploidy model parameters")
+                   help="Path to ploidy-model parameters")
 
 group.add_argument("--output_calls_path",
                    type=str,
@@ -38,8 +38,14 @@ group.add_argument("--output_calls_path",
 gcnvkernel.PloidyModelConfig.expose_args(
     parser,
     hide={
-        "--mean_bias_sd",
-        "--psi_j_scale"
+        "--ploidy_concentration_scale",
+        "--error_rate_upper_bound",
+        "--contig_bias_lower_bound",
+        "--contig_bias_upper_bound",
+        "--contig_bias_scale",
+        "--mosaicism_bias_lower_bound",
+        "--mosaicism_bias_upper_bound",
+        "--mosaicism_bias_scale"
     })
 
 # override some inference parameters
