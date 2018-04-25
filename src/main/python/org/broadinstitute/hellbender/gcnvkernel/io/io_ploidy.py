@@ -1,5 +1,6 @@
 import logging
 import os
+from collections import defaultdict
 from typing import List, Dict
 
 import numpy as np
@@ -174,26 +175,35 @@ class PloidyModelReader:
         io_commons.read_meanfield_global_params(self.input_path, self.ploidy_model_approx, self.ploidy_model)
 
 
-def get_contig_ploidy_prior_map_from_tsv_file(input_path: str,
+def get_ploidy_state_priors_map_from_tsv_file(input_path: str,
                                               comment=io_consts.default_comment_char,
-                                              delimiter=io_consts.default_delimiter_char) -> Dict[str, np.ndarray]:
-    contig_ploidy_prior_pd = pd.read_csv(input_path, delimiter=delimiter, comment=comment)
-    columns = [str(x) for x in contig_ploidy_prior_pd.columns.values]
-    assert len(columns) > 1
-    assert columns[0] == io_consts.ploidy_prior_contig_name_column
-    contig_list = [str(x) for x in contig_ploidy_prior_pd['CONTIG_NAME'].values]
-    assert all([len(column) > len(io_consts.ploidy_prior_prefix)
-                and column[:len(io_consts.ploidy_prior_prefix)] == io_consts.ploidy_prior_prefix
-                for column in columns[1:]])
-    ploidy_values = [int(column[len(io_consts.ploidy_prior_prefix):]) for column in columns[1:]]
-    num_ploidy_states = np.max(ploidy_values) + 1
-    contig_ploidy_prior_map: Dict[str, np.ndarray] = dict()
-    for contig in contig_list:
-        contig_ploidy_prior_map[contig] = np.zeros((num_ploidy_states,), dtype=types.floatX)
-    for ploidy in range(num_ploidy_states):
-        column_name = io_consts.ploidy_prior_prefix + str(ploidy)
-        if column_name in columns:
-            values = [float(x) for x in contig_ploidy_prior_pd[column_name].values]
-            for j, contig in enumerate(contig_list):
-                contig_ploidy_prior_map[contig][ploidy] = values[j]
-    return contig_ploidy_prior_map
+                                              delimiter=io_consts.default_delimiter_char) \
+        -> Dict[List[str], Dict[List[int], float]]:
+    ploidy_state_priors_pd = pd.read_csv(input_path, delimiter=delimiter, comment=comment,
+                                         dtype={'CONTIG_TUPLE': str,
+                                                'PLOIDY_STATE': str,
+                                                'RELATIVE_PROBABILITY': float})
+    columns = [str(x) for x in ploidy_state_priors_pd.columns.values]
+    assert columns == ['CONTIG_TUPLE', 'PLOIDY_STATE', 'RELATIVE_PROBABILITY']
+
+    # read in the relative (unnormalized) probabilities
+    raw_ploidy_state_priors_map = defaultdict(dict)
+    for _, row in ploidy_state_priors_pd.iterrows():
+        contig_tuple = tuple(x for x in row['CONTIG_TUPLE'][1:-1].split(','))
+        ploidy_state = tuple(int(x) for x in row['PLOIDY_STATE'][1:-1].split(','))
+        assert len(contig_tuple) == len(ploidy_state)
+        relative_prob = row['RELATIVE_PROBABILITY']
+        assert relative_prob > 0, \
+            "Relative probabilities must be positive.  " \
+            "Ploidy states with zero probability should not be included in the priors file."
+        raw_ploidy_state_priors_map[contig_tuple][ploidy_state] = relative_prob
+
+    # normalize the probabilities
+    ploidy_state_priors_map = defaultdict(dict)
+    for contig_tuple in raw_ploidy_state_priors_map:
+        normalizing_factor = sum(raw_ploidy_state_priors_map[contig_tuple].values())
+        for ploidy_state, relative_prob in raw_ploidy_state_priors_map[contig_tuple].items():
+            ploidy_state_priors_map[contig_tuple][ploidy_state] = \
+                raw_ploidy_state_priors_map[contig_tuple][ploidy_state] / normalizing_factor
+
+    return ploidy_state_priors_map

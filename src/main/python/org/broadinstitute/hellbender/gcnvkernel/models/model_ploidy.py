@@ -20,47 +20,85 @@ _logger = logging.getLogger(__name__)
 
 
 class PloidyModelConfig:
-    """Germline contig-ploidy-model hyperparameters."""
+    """Germline ploidy-model hyperparameters."""
     def __init__(self,
-                 ploidy_state_priors_map: Dict[tuple, float] = None,
-                 mean_bias_sd: float = 1e-2,
-                 psi_j_scale: float = 1e-3,
-                 psi_s_scale: float = 1e-4,
-                 mapping_error_rate: float = 1e-2):
+                 ploidy_state_priors_map: Dict[List[str], Dict[List[int], float]] = None,
+                 ploidy_concentration_scale: float = 0.1,
+                 error_rate_upper_bound: float = 0.1,
+                 contig_bias_lower_bound: float = 0.8,
+                 contig_bias_upper_bound: float = 1.2,
+                 contig_bias_scale: float = 100.0,
+                 mosaicism_bias_lower_bound: float = -0.9,
+                 mosaicism_bias_upper_bound: float = 0.5,
+                 mosaicism_bias_scale: float = 0.01):
         """Initializer.
 
         Args:
-            ploidy_state_priors_map: map from contigs to prior probabilities of each ploidy state
-            mean_bias_sd: standard deviation of mean contig-level coverage bias
-            psi_j_scale: typical scale of contig-specific unexplained variance
-            psi_s_scale: typical scale of sample-specific unexplained variance
-            mapping_error_rate: typical mapping error probability
+            ploidy_state_priors_map: Map of ploidy-state priors
+            ploidy_concentration_scale: Scaling factor for the concentration parameters of the per-contig-set
+                                        Dirichlet prior on ploidy states
+            error_rate_upper_bound: Upper bound of the uniform prior on the error rate
+            contig_bias_lower_bound: Lower bound of the Gamma prior on the per-contig bias
+            contig_bias_upper_bound: Upper bound of the Gamma prior on the per-contig bias
+            contig_bias_scale: Scaling factor for the Gamma prior on the per-contig bias
+            mosaicism_bias_lower_bound: Lower bound of the Gaussian prior on the per-sample-and-contig mosaicism bias
+            mosaicism_bias_upper_bound: Upper bound of the Gaussian prior on the per-sample-and-contig mosaicism bias
+            mosaicism_bias_scale: Standard deviation of the Gaussian prior on the per-sample-and-contig "
+                                  mosaicism bias
         """
         assert ploidy_state_priors_map is not None
-        self.mean_bias_sd = mean_bias_sd
-        self.psi_j_scale = psi_j_scale
-        self.psi_s_scale = psi_s_scale
-        self.mapping_error_rate = mapping_error_rate
-        self.ploidy_state_priors_map, self.num_ploidy_states = self._get_validated_contig_ploidy_prior_map(
+        self.ploidy_state_priors_map, self.num_ploidy_states = self._process_ploidy_state_priors_map(
             ploidy_state_priors_map)
-        self.contig_set = set(contig_ploidy_prior_map.keys())
-        self.unordered_contig_list = list(self.contig_set)
+
+        self.ploidy_concentration_scale = ploidy_concentration_scale
+        self.error_rate_upper_bound = error_rate_upper_bound
+        self.contig_bias_lower_bound = contig_bias_lower_bound
+        self.contig_bias_upper_bound = contig_bias_upper_bound
+        self.contig_bias_scale = contig_bias_scale
+        self.mosaicism_bias_lower_bound = mosaicism_bias_lower_bound
+        self.mosaicism_bias_upper_bound = mosaicism_bias_upper_bound
+        self.mosaicism_bias_scale = mosaicism_bias_scale
 
     @staticmethod
-    def _get_validated_contig_ploidy_prior_map(given_contig_ploidy_prior_map: Dict[str, np.ndarray],
-                                               min_prob: float = 0) -> Tuple[Dict[str, np.ndarray], int]:
-        given_contigs = set(given_contig_ploidy_prior_map.keys())
-        num_ploidy_states: int = 0
-        for contig in given_contigs:
-            num_ploidy_states = max(num_ploidy_states, given_contig_ploidy_prior_map[contig].size)
-        validated_contig_ploidy_prior_map: Dict[str, np.ndarray] = dict()
-        for contig in given_contigs:
-            padded_validated_prior = np.zeros((num_ploidy_states,), dtype=types.floatX) + min_prob
-            given_prior = given_contig_ploidy_prior_map[contig].flatten()
-            padded_validated_prior[:given_prior.size] = padded_validated_prior[:given_prior.size] + given_prior
-            padded_validated_prior = commons.get_normalized_prob_vector(padded_validated_prior, config.prob_sum_tol)
-            validated_contig_ploidy_prior_map[contig] = padded_validated_prior
-        return validated_contig_ploidy_prior_map, num_ploidy_states
+    def _process_ploidy_state_priors_map(input_ploidy_state_priors_map: Dict[List[str], Dict[List[int], float]],
+                                         min_prob: float = 0) -> Tuple[Dict[List[str], Dict[List[int], float]], int]:
+        # given_contigs = set(given_contig_ploidy_prior_map.keys())
+        # num_ploidy_states: int = 0
+        # for contig in given_contigs:
+        #     num_ploidy_states = max(num_ploidy_states, given_contig_ploidy_prior_map[contig].size)
+        # validated_contig_ploidy_prior_map: Dict[str, np.ndarray] = dict()
+        # for contig in given_contigs:
+        #     padded_validated_prior = np.zeros((num_ploidy_states,), dtype=types.floatX) + min_prob
+        #     given_prior = given_contig_ploidy_prior_map[contig].flatten()
+        #     padded_validated_prior[:given_prior.size] = padded_validated_prior[:given_prior.size] + given_prior
+        #     padded_validated_prior = commons.get_normalized_prob_vector(padded_validated_prior, config.prob_sum_tol)
+        #     validated_contig_ploidy_prior_map[contig] = padded_validated_prior
+        # return validated_contig_ploidy_prior_map, num_ploidy_states
+
+        # contig_sets = []
+        # for j in range(num_contigs)[:-2]:
+        #     contig_sets.append([j])
+        # contig_sets.append([num_contigs - 2, num_contigs - 1])
+        #
+        # num_contig_sets = len(contig_sets)
+        #
+        # ploidy_states_ik = []
+        # ploidy_priors_ik_unnorm = []
+        # for contig_set in contig_sets[:-1]:
+        #     ploidy_states_ik.append([[2]])
+        #     ploidy_priors_ik_unnorm.append(np.array([1.]))
+        # ploidy_states_ik.append([[2, 0], [1, 1], [1, 0], [3, 0], [1, 2], [2, 1]])
+        # ploidy_priors_ik_unnorm.append(np.array([1., 1., 0.02, 0.02, 0.02, 0.02]))
+        #
+        # ploidy_priors_ik_unnorm = np.array(ploidy_priors_ik_unnorm)
+        # ploidy_priors_ik = [(ploidy_priors_ik_unnorm[i] + eps) / np.sum(ploidy_priors_ik_unnorm[i] + eps)
+        #                     for i in range(num_contig_sets)]
+        #
+        # ploidy_jk = []
+        # for i, contig_set in enumerate(contig_sets):
+        #     for j_index, j in enumerate(contig_set):
+        #         ploidy_jk.append(np.array([ploidy_state[j_index] for ploidy_state in ploidy_states_ik[i]]))
+        return input_ploidy_state_priors_map, 0
 
     @staticmethod
     def expose_args(args: argparse.ArgumentParser, hide: Set[str] = None):
@@ -73,7 +111,7 @@ class PloidyModelConfig:
         Returns:
             None
         """
-        group = args.add_argument_group(title="Copy number calling parameters")
+        group = args.add_argument_group(title="Ploidy-model parameters")
         if hide is None:
             hide = set()
 
@@ -91,25 +129,47 @@ class PloidyModelConfig:
             kwargs['default'] = initializer_params[arg].default
             group.add_argument(full_arg, **kwargs)
 
-        process_and_maybe_add("mean_bias_sd",
+        process_and_maybe_add("ploidy_concentration_scale",
                               type=float,
-                              help="Contig-level mean coverage bias standard deviation",
-                              default=initializer_params['mean_bias_sd'].default)
+                              help="Scaling factor for the concentration parameters of the per-contig-set "
+                                   "Dirichlet prior on ploidy states",
+                              default=initializer_params['ploidy_concentration_scale'].default)
 
-        process_and_maybe_add("mapping_error_rate",
+        process_and_maybe_add("error_rate_upper_bound",
                               type=float,
-                              help="Typical mapping error rate",
-                              default=initializer_params['mapping_error_rate'].default)
+                              help="Upper bound of the uniform prior on the error rate",
+                              default=initializer_params['error_rate_upper_bound'].default)
 
-        process_and_maybe_add("psi_j_scale",
+        process_and_maybe_add("contig_bias_lower_bound",
                               type=float,
-                              help="Typical scale of contig-specific unexplained coverage variance",
-                              default=initializer_params['psi_j_scale'].default)
+                              help="Lower bound of the Gamma prior on the per-contig bias",
+                              default=initializer_params['contig_bias_lower_bound'].default)
 
-        process_and_maybe_add("psi_s_scale",
+        process_and_maybe_add("contig_bias_upper_bound",
                               type=float,
-                              help="Typical scale of sample-specific unexplained coverage variance",
-                              default=initializer_params['psi_s_scale'].default)
+                              help="Upper bound of the Gamma prior on the per-contig bias",
+                              default=initializer_params['contig_bias_upper_bound'].default)
+
+        process_and_maybe_add("contig_bias_scale",
+                              type=float,
+                              help="Scaling factor for the Gamma prior on the per-contig bias",
+                              default=initializer_params['contig_bias_scale'].default)
+
+        process_and_maybe_add("mosaicism_bias_lower_bound",
+                              type=float,
+                              help="Lower bound of the Gaussian prior on the per-sample-and-contig mosaicism bias",
+                              default=initializer_params['mosaicism_bias_lower_bound'].default)
+
+        process_and_maybe_add("mosaicism_bias_upper_bound",
+                              type=float,
+                              help="Upper bound of the Gaussian prior on the per-sample-and-contig mosaicism bias",
+                              default=initializer_params['mosaicism_bias_upper_bound'].default)
+
+        process_and_maybe_add("mosaicism_bias_scale",
+                              type=float,
+                              help="Standard deviation of the Gaussian prior on the per-sample-and-contig "
+                                   "mosaicism bias",
+                              default=initializer_params['mosaicism_bias_scale'].default)
 
     @staticmethod
     def from_args_dict(args_dict: Dict):

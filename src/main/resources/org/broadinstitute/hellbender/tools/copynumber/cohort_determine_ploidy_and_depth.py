@@ -46,6 +46,12 @@ group.add_argument("--output_calls_path",
                    default=argparse.SUPPRESS,
                    help="Output path to write posteriors")
 
+# group.add_argument("--output_plots_path",
+#                    type=str,
+#                    required=True,
+#                    default=argparse.SUPPRESS,
+#                    help="Output path to write plots")
+
 # optional arguments
 gcnvkernel.PloidyModelConfig.expose_args(parser)
 
@@ -73,20 +79,20 @@ if __name__ == "__main__":
     args = parser.parse_args()
     gcnvkernel.cli_commons.set_logging_config_from_args(args)
 
-    # read contig ploidy prior map from file
-    contig_ploidy_prior_map = gcnvkernel.io_ploidy.get_contig_ploidy_prior_map_from_tsv_file(
-        args.contig_ploidy_prior_table)
+    # read ploidy-state prior map from file
+    ploidy_state_priors_map = gcnvkernel.io_ploidy.get_ploidy_state_priors_map_from_tsv_file(
+        args.ploidy_state_priors_table)
 
     # load interval list
     interval_list = gcnvkernel.io_intervals_and_counts.load_interval_list_tsv_file(args.interval_list)
 
-    # load sample coverage metadata
-    sample_metadata_collection: gcnvkernel.SampleMetadataCollection = gcnvkernel.SampleMetadataCollection()
-    sample_names = gcnvkernel.io_metadata.read_sample_coverage_metadata(
-        sample_metadata_collection, args.sample_coverage_metadata)
-
-    # generate interval list metadata
-    intervals_metadata: gcnvkernel.IntervalListMetadata = gcnvkernel.IntervalListMetadata(interval_list)
+    # # load sample coverage metadata
+    # sample_metadata_collection: gcnvkernel.SampleMetadataCollection = gcnvkernel.SampleMetadataCollection()
+    # sample_names = gcnvkernel.io_metadata.read_sample_coverage_metadata(
+    #     sample_metadata_collection, args.sample_coverage_metadata)
+    #
+    # # generate interval list metadata
+    # intervals_metadata: gcnvkernel.IntervalListMetadata = gcnvkernel.IntervalListMetadata(interval_list)
 
     # # inject ploidy prior map to the dictionary of parsed args
     # args_dict = args.__dict__

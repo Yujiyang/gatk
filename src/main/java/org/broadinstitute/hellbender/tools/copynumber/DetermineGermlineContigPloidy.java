@@ -334,7 +334,7 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
                             "read-count files.", inputReadCountFile));
             //calculate per-contig count distributions and write temporary file for this sample
             new ContigCountDistributionCollection(readCounts, maximumCount)
-                    .write(new File(contigCountDistributionCollectionsDir, String.format("SAMPLE-%d", sampleIndex)));
+                    .write(new File(contigCountDistributionCollectionsDir, String.format("SAMPLE-%d.tsv", sampleIndex)));
         }
     }
 

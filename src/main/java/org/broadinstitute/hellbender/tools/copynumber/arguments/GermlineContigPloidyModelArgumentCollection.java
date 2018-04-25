@@ -72,18 +72,16 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
     @Argument(
             doc = "Lower bound of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
             fullName = MOSAICISM_BIAS_LOWER_BOUND_LONG_NAME,
-            minValue = 0.,
             optional = true
     )
-    private double mosaicismBiasLowerBound = 0.8;
+    private double mosaicismBiasLowerBound = -0.9;
 
     @Argument(
             doc = "Upper bound of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
             fullName = MOSAICISM_BIAS_UPPER_BOUND_LONG_NAME,
-            minValue = 0.,
             optional = true
     )
-    private double mosaicismBiasUpperBound = 1.2;
+    private double mosaicismBiasUpperBound = 0.5;
 
     @Argument(
             doc = "Standard deviation of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
@@ -91,7 +89,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             minValue = 0.,
             optional = true
     )
-    private double mosaicismBiasScale = 100.;
+    private double mosaicismBiasScale = 0.01;
 
     public List<String> generatePythonArguments(final DetermineGermlineContigPloidy.RunMode runMode) {
         if (runMode == DetermineGermlineContigPloidy.RunMode.COHORT) {
@@ -119,10 +117,10 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
                 "Upper bound of the per-contig bias must be positive.");
         ParamUtils.isPositive(contigBiasScale,
                 "Scale of the per-contig bias must be positive.");
-        ParamUtils.isPositive(mosaicismBiasLowerBound,
-                "Lower bound of the per-sample-and-contig mosaicism bias must be positive.");
-        ParamUtils.isPositive(mosaicismBiasUpperBound,
-                "Upper bound of the per-sample-and-contig mosaicism bias must be positive.");
+        ParamUtils.isFinite(mosaicismBiasLowerBound,
+                "Lower bound of the per-sample-and-contig mosaicism bias must be finite.");
+        ParamUtils.isFinite(mosaicismBiasUpperBound,
+                "Upper bound of the per-sample-and-contig mosaicism bias must be finite.");
         ParamUtils.isPositive(mosaicismBiasScale,
                 "Scale of the per-sample-and-contig mosaicism bias must be positive.");
         Utils.validateArg(contigBiasLowerBound < contigBiasUpperBound,
