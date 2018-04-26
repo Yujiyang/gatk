@@ -34,7 +34,10 @@ class PloidyModelConfig:
         """Initializer.
 
         Args:
-            ploidy_state_priors_map: Map of ploidy-state priors
+            ploidy_state_priors_map: Map of the ploidy-state priors. This is a defaultdict(OrderedDict).  The keys
+                                     of the defaultdict are the contig tuples.  The keys of the OrderedDict
+                                     are the ploidy states, and the values of the OrderedDict are the normalized
+                                     prior probabilities.
             ploidy_concentration_scale: Scaling factor for the concentration parameters of the per-contig-set
                                         Dirichlet prior on ploidy states
             error_rate_upper_bound: Upper bound of the uniform prior on the error rate
@@ -47,8 +50,8 @@ class PloidyModelConfig:
                                   mosaicism bias
         """
         assert ploidy_state_priors_map is not None
-        self.ploidy_state_priors_map, self.num_ploidy_states = self._process_ploidy_state_priors_map(
-            ploidy_state_priors_map)
+        self.ploidy_states_ik, self.ploidy_state_priors_ik, self.ploidy_jk, self.contig_tuples, self.contigs = \
+            self._process_ploidy_state_priors_map(ploidy_state_priors_map)
 
         self.ploidy_concentration_scale = ploidy_concentration_scale
         self.error_rate_upper_bound = error_rate_upper_bound
@@ -60,45 +63,33 @@ class PloidyModelConfig:
         self.mosaicism_bias_scale = mosaicism_bias_scale
 
     @staticmethod
-    def _process_ploidy_state_priors_map(input_ploidy_state_priors_map: Dict[List[str], Dict[List[int], float]],
-                                         min_prob: float = 0) -> Tuple[Dict[List[str], Dict[List[int], float]], int]:
-        # given_contigs = set(given_contig_ploidy_prior_map.keys())
-        # num_ploidy_states: int = 0
-        # for contig in given_contigs:
-        #     num_ploidy_states = max(num_ploidy_states, given_contig_ploidy_prior_map[contig].size)
-        # validated_contig_ploidy_prior_map: Dict[str, np.ndarray] = dict()
-        # for contig in given_contigs:
-        #     padded_validated_prior = np.zeros((num_ploidy_states,), dtype=types.floatX) + min_prob
-        #     given_prior = given_contig_ploidy_prior_map[contig].flatten()
-        #     padded_validated_prior[:given_prior.size] = padded_validated_prior[:given_prior.size] + given_prior
-        #     padded_validated_prior = commons.get_normalized_prob_vector(padded_validated_prior, config.prob_sum_tol)
-        #     validated_contig_ploidy_prior_map[contig] = padded_validated_prior
-        # return validated_contig_ploidy_prior_map, num_ploidy_states
+    def _process_ploidy_state_priors_map(ploidy_state_priors_map: Dict[List[str], Dict[List[int], float]],
+                                         min_prob: float = 0) \
+            -> Tuple[List[List[Tuple[int]]], List[np.ndarray], List[np.ndarray], List[Tuple[str]], List[str]]:
+        contig_tuples: List[Tuple[str]] = list(ploidy_state_priors_map.keys())
 
-        # contig_sets = []
-        # for j in range(num_contigs)[:-2]:
-        #     contig_sets.append([j])
-        # contig_sets.append([num_contigs - 2, num_contigs - 1])
-        #
-        # num_contig_sets = len(contig_sets)
-        #
-        # ploidy_states_ik = []
-        # ploidy_priors_ik_unnorm = []
-        # for contig_set in contig_sets[:-1]:
-        #     ploidy_states_ik.append([[2]])
-        #     ploidy_priors_ik_unnorm.append(np.array([1.]))
-        # ploidy_states_ik.append([[2, 0], [1, 1], [1, 0], [3, 0], [1, 2], [2, 1]])
-        # ploidy_priors_ik_unnorm.append(np.array([1., 1., 0.02, 0.02, 0.02, 0.02]))
-        #
-        # ploidy_priors_ik_unnorm = np.array(ploidy_priors_ik_unnorm)
-        # ploidy_priors_ik = [(ploidy_priors_ik_unnorm[i] + eps) / np.sum(ploidy_priors_ik_unnorm[i] + eps)
-        #                     for i in range(num_contig_sets)]
-        #
-        # ploidy_jk = []
-        # for i, contig_set in enumerate(contig_sets):
-        #     for j_index, j in enumerate(contig_set):
-        #         ploidy_jk.append(np.array([ploidy_state[j_index] for ploidy_state in ploidy_states_ik[i]]))
-        return input_ploidy_state_priors_map, 0
+        # i = contig-tuple index, j = contig index, k = ploidy-state index
+        ploidy_states_ik: List[List[Tuple[int]]] = [list(ploidy_state_priors_map[contig_tuple].keys())
+                                                    for contig_tuple in contig_tuples]
+        ploidy_state_priors_ik: List[np.ndarray] = [np.fromiter(ploidy_state_priors_map[contig_tuple].values(),
+                                                                 dtype=float)
+                                                     for contig_tuple in contig_tuples]
+
+        ploidy_jk: List[np.ndarray] = []
+        contigs: List[str] = []
+        for i, contig_tuple in enumerate(contig_tuples):
+            for contig_index, contig in enumerate(contig_tuple):
+                ploidy_jk.append(np.array([ploidy_state[contig_index] for ploidy_state in ploidy_states_ik[i]]))
+                if contig not in contigs:
+                    contigs.append(contig)
+
+        print(ploidy_states_ik)
+        print(ploidy_state_priors_ik)
+        print(ploidy_jk)
+        print(contig_tuples)
+        print(contigs)
+
+        return ploidy_states_ik, ploidy_state_priors_ik, ploidy_jk, contig_tuples, contigs
 
     @staticmethod
     def expose_args(args: argparse.ArgumentParser, hide: Set[str] = None):

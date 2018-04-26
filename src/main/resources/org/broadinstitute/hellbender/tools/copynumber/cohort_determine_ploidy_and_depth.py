@@ -95,16 +95,16 @@ if __name__ == "__main__":
     # generate interval list metadata
     intervals_metadata: gcnvkernel.IntervalListMetadata = gcnvkernel.IntervalListMetadata(interval_list)
 
-    # # inject ploidy prior map to the dictionary of parsed args
-    # args_dict = args.__dict__
-    # args_dict['contig_ploidy_prior_map'] = contig_ploidy_prior_map
-    #
-    # ploidy_config = gcnvkernel.PloidyModelConfig.from_args_dict(args_dict)
-    # ploidy_inference_params = gcnvkernel.HybridInferenceParameters.from_args_dict(args_dict)
-    # ploidy_workspace = gcnvkernel.PloidyWorkspace(ploidy_config, intervals_metadata, sample_names,
-    #                                               sample_metadata_collection)
-    # ploidy_task = gcnvkernel.CohortPloidyInferenceTask(ploidy_inference_params, ploidy_config, ploidy_workspace)
-    #
+    # inject ploidy-state priors map to the dictionary of parsed args
+    args_dict = args.__dict__
+    args_dict['ploidy_state_priors_map'] = ploidy_state_priors_map
+
+    ploidy_config = gcnvkernel.PloidyModelConfig.from_args_dict(args_dict)
+    ploidy_inference_params = gcnvkernel.HybridInferenceParameters.from_args_dict(args_dict)
+    ploidy_workspace = gcnvkernel.PloidyWorkspace(ploidy_config, intervals_metadata, sample_names,
+                                                  sample_metadata_collection)
+    ploidy_task = gcnvkernel.CohortPloidyInferenceTask(ploidy_inference_params, ploidy_config, ploidy_workspace)
+
     # # go!
     # ploidy_task.engage()
     # ploidy_task.disengage()

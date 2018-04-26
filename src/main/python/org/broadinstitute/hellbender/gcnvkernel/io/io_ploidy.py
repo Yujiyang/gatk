@@ -1,6 +1,6 @@
 import logging
 import os
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 from typing import List, Dict
 
 import numpy as np
@@ -179,6 +179,14 @@ def get_ploidy_state_priors_map_from_tsv_file(input_path: str,
                                               comment=io_consts.default_comment_char,
                                               delimiter=io_consts.default_delimiter_char) \
         -> Dict[List[str], Dict[List[int], float]]:
+    """Reads the ploidy-state priors from a file.
+
+    Returns:
+        A map of the ploidy-state priors. This is a defaultdict(OrderedDict).
+        The keys of the defaultdict are the contig tuples.
+        The keys of the OrderedDict are the ploidy states, and
+        the values of the OrderedDict are the normalized prior probabilities.
+    """
     ploidy_state_priors_pd = pd.read_csv(input_path, delimiter=delimiter, comment=comment,
                                          dtype={'CONTIG_TUPLE': str,
                                                 'PLOIDY_STATE': str,
@@ -196,10 +204,12 @@ def get_ploidy_state_priors_map_from_tsv_file(input_path: str,
         assert relative_prob > 0, \
             "Relative probabilities must be positive.  " \
             "Ploidy states with zero probability should not be included in the priors file."
+        assert ploidy_state not in raw_ploidy_state_priors_map[contig_tuple], \
+            "Relative probability should be specified only once for each contig-tuple--ploidy-state combination."
         raw_ploidy_state_priors_map[contig_tuple][ploidy_state] = relative_prob
 
     # normalize the probabilities
-    ploidy_state_priors_map = defaultdict(dict)
+    ploidy_state_priors_map = defaultdict(OrderedDict)
     for contig_tuple in raw_ploidy_state_priors_map:
         normalizing_factor = sum(raw_ploidy_state_priors_map[contig_tuple].values())
         for ploidy_state, relative_prob in raw_ploidy_state_priors_map[contig_tuple].items():
