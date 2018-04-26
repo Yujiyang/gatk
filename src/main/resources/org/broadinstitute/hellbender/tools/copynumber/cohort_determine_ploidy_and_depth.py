@@ -87,13 +87,13 @@ if __name__ == "__main__":
     # load interval list
     interval_list = gcnvkernel.io_intervals_and_counts.load_interval_list_tsv_file(args.interval_list)
 
-    # # load sample coverage metadata
-    # sample_metadata_collection: gcnvkernel.SampleMetadataCollection = gcnvkernel.SampleMetadataCollection()
-    # sample_names = gcnvkernel.io_metadata.read_sample_coverage_metadata(
-    #     sample_metadata_collection, args.sample_coverage_metadata)
-    #
-    # # generate interval list metadata
-    # intervals_metadata: gcnvkernel.IntervalListMetadata = gcnvkernel.IntervalListMetadata(interval_list)
+    # load sample coverage metadata
+    sample_metadata_collection: gcnvkernel.SampleMetadataCollection = gcnvkernel.SampleMetadataCollection()
+    sample_names = gcnvkernel.io_metadata.read_sample_coverage_metadata(
+        sample_metadata_collection, args.contig_count_distribution_collection_files)
+
+    # generate interval list metadata
+    intervals_metadata: gcnvkernel.IntervalListMetadata = gcnvkernel.IntervalListMetadata(interval_list)
 
     # # inject ploidy prior map to the dictionary of parsed args
     # args_dict = args.__dict__

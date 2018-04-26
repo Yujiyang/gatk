@@ -78,7 +78,6 @@ public final class ContigCountDistributionCollection extends AbstractRecordColle
         Utils.nonNull(readCounts);
         ParamUtils.isPositiveOrZero(maximumCount, "Maximum count must be non-negative.");
         final Map<String, Map<Integer, Integer>> mapOfMaps = readCounts.getRecords().stream()
-                .filter(c -> c.getCount() <= maximumCount)
                 .collect(Collectors.groupingBy(
                         SimpleCount::getContig,
                         Collectors.groupingBy(

@@ -61,33 +61,32 @@ def read_sample_coverage_metadata(sample_metadata_collection: SampleMetadataColl
         delimiter: delimiter character
 
     Returns:
-        list of samples in the same order as encountered in `input_file`
+        list of samples in the same order as encountered in `input_files`
     """
     sample_names = []
     for sample_index, input_file in enumerate(input_files):
         coverage_metadata_pd = pd.read_csv(input_file, delimiter=delimiter, comment=comment)
         found_columns_list = [str(column) for column in coverage_metadata_pd.columns.values]
         io_commons.assert_mandatory_columns({io_consts.contig_column_name}, set(found_columns_list), input_file)
-        counts_list = found_columns_list.copy()
-        counts_list.remove(io_consts.contig_column_name)
+        count_columns = found_columns_list.copy()
+        count_columns.remove(io_consts.contig_column_name)
         if sample_index == 0:
-            max_count = len(counts_list) - 1
-            num_contigs = len(coverage_metadata_pd)
+            max_count = len(count_columns) - 1
+            contig_list = coverage_metadata_pd[io_consts.contig_column_name].tolist()
+            num_contigs = len(contig_list)
         else:
-            assert len(counts_list) - 1 == max_count, \
+            assert len(count_columns) - 1 == max_count, \
                 "Maximum count in per-contig count distribution file \"{0}\" " \
                 "does not match that in other files.".format(input_file)
-            assert len(coverage_metadata_pd) == num_contigs, \
-                "Number of contigs in per-contig count distribution file \"{0}\" " \
-                "does not match that in other files.".format(input_file)
-
-        # for tup in zip(coverage_metadata_pd[io_consts.sample_name_column_name],
-        #                *(coverage_metadata_pd[contig] for contig in contig_list)):
-        #     sample_name = str(tup[0])
-        #     n_jm = np.asarray([int(tup[k + 1]) for k in range(num_contigs)], dtype=types.big_uint)
-        #     sample_metadata_collection.add_sample_coverage_metadata(SampleCoverageMetadata(
-        #         sample_name, n_j, contig_list))
-        #     sample_names.append(sample_name)
+            assert coverage_metadata_pd[io_consts.contig_column_name].tolist() == contig_list, \
+                "Contigs {0} in per-contig count distribution file \"{1}\" " \
+                "do not match those in other files.".format(coverage_metadata_pd[io_consts.contig_column_name].tolist(), input_file)
+        sample_name = io_commons.extract_sample_name_from_header(input_file)
+        sample_names.append(sample_name)
+        n_jm = np.asarray([coverage_metadata_pd.loc[j, count_columns] for j in range(num_contigs)],
+                          dtype=types.med_uint)
+        sample_metadata_collection.add_sample_coverage_metadata(SampleCoverageMetadata(
+            sample_name, n_jm, contig_list))
 
     return sample_names
 

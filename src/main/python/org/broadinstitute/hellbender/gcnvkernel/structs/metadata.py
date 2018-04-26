@@ -55,37 +55,33 @@ class SampleCoverageMetadata:
                  n_jm: np.ndarray,
                  contig_list: List[str]):
         assert n_jm.ndim == 2
-        assert n_jm.size[0] == len(contig_list)
+        assert n_jm.shape[0] == len(contig_list)
 
         self.sample_name = sample_name
         self.contig_list = contig_list
 
-        # total count per contig
-        self.n_j = n_j.astype(types.med_uint)
+        # per-contig count distribution
+        # j = contig index, m = count index
+        self.n_jm = n_jm.astype(types.med_uint)
 
-        # total count
-        self.n_total = np.sum(self.n_j)
         self._contig_map = {contig: j for j, contig in enumerate(contig_list)}
 
     def _assert_contig_exists(self, contig: str):
         assert contig in self._contig_map, \
             "Sample ({0}) does not have coverage metadata for contig ({1})".format(self.sample_name, contig)
 
-    def get_contig_total_count(self, contig: str):
+    def get_contig_count_distribution(self, contig: str):
         self._assert_contig_exists(contig)
-        return self.n_j[self._contig_map[contig]]
+        return self.n_jm[self._contig_map[contig]]
 
-    def get_total_count(self):
-        return self.n_total
-
-    @staticmethod
-    def generate_sample_coverage_metadata(sample_name,
-                                          n_t: np.ndarray,
-                                          interval_list_metadata: IntervalListMetadata):
-        n_j = np.zeros((len(interval_list_metadata.ordered_contig_list),), dtype=types.big_uint)
-        for j, contig in enumerate(interval_list_metadata.ordered_contig_list):
-            n_j[j] = np.sum(n_t[interval_list_metadata.contig_interval_indices[contig]])
-        return SampleCoverageMetadata(sample_name, n_j, interval_list_metadata.ordered_contig_list)
+    # @staticmethod
+    # def generate_sample_coverage_metadata(sample_name,
+    #                                       n_t: np.ndarray,
+    #                                       interval_list_metadata: IntervalListMetadata):
+    #     n_j = np.zeros((len(interval_list_metadata.ordered_contig_list),), dtype=types.big_uint)
+    #     for j, contig in enumerate(interval_list_metadata.ordered_contig_list):
+    #         n_j[j] = np.sum(n_t[interval_list_metadata.contig_interval_indices[contig]])
+    #     return SampleCoverageMetadata(sample_name, n_j, interval_list_metadata.ordered_contig_list)
 
 
 class SamplePloidyMetadata:
