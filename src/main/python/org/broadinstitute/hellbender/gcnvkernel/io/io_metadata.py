@@ -14,40 +14,6 @@ from ..structs.metadata import SampleReadDepthMetadata, SamplePloidyMetadata, Sa
 _logger = logging.getLogger(__name__)
 
 
-def write_sample_coverage_metadata(sample_metadata_collection: SampleMetadataCollection,
-                                   sample_names: List[str],
-                                   output_file: str):
-    """Write coverage metadata for all samples in a given `SampleMetadataCollection` to a single .tsv file
-    in the same order as `sample_names`.
-
-    Args:
-        sample_metadata_collection: an instance of `SampleMetadataCollection`
-        sample_names: list of samples to process
-        output_file: output .tsv file
-
-    Raises:
-        AssertionError: if some of the samples do not have `SampleCoverageMetadata` annotation
-
-    Returns:
-        None
-    """
-    assert len(sample_names) > 0
-    assert sample_metadata_collection.all_samples_have_coverage_metadata(sample_names)
-    contig_list = sample_metadata_collection.sample_coverage_metadata_dict[sample_names[0]].contig_list
-    for sample_name in sample_names:
-        assert sample_metadata_collection.sample_coverage_metadata_dict[sample_name].contig_list == contig_list
-    parent_path = os.path.dirname(output_file)
-    io_commons.assert_output_path_writable(parent_path)
-    with open(output_file, 'w') as tsv_file:
-        writer = csv.writer(tsv_file, delimiter='\t')
-        header = [io_consts.sample_name_column_name] + [contig for contig in contig_list]
-        writer.writerow(header)
-        for sample_name in sample_names:
-            sample_coverage_metadata = sample_metadata_collection.get_sample_coverage_metadata(sample_name)
-            row = ([sample_name] + [repr(sample_coverage_metadata.n_j[j]) for j in range(len(contig_list))])
-            writer.writerow(row)
-
-
 def read_sample_coverage_metadata(sample_metadata_collection: SampleMetadataCollection,
                                   input_files: List[str],
                                   comment=io_consts.default_comment_char,
