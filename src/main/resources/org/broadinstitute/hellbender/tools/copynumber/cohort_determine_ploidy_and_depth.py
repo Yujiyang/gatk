@@ -22,11 +22,12 @@ group.add_argument("--interval_list",
                    default=argparse.SUPPRESS,
                    help="Interval list of included genomic regions in the analysis (in .tsv format)")
 
-group.add_argument("--contig_count_distribution_collections_path",
+group.add_argument("--contig_count_distribution_collection_files",
                    type=str,
                    required=True,
+                   nargs='+',  # one or more
                    default=argparse.SUPPRESS,
-                   help="Path containing per-contig count-distribution files for all samples (in .tsv format)")
+                   help="List of per-contig count-distribution files for all samples (in .tsv format; must include sample name header)")
 
 group.add_argument("--ploidy_state_priors_table",
                    type=str,

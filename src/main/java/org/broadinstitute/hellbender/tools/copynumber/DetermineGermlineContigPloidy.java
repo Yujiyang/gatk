@@ -265,11 +265,12 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         final LocatableMetadata metadata = new SimpleLocatableMetadata(sequenceDictionary);
         new SimpleIntervalCollection(metadata, intervals).write(intervalsFile);
         final File contigCountDistributionCollectionsDir = IOUtils.tempDir("contig-count-distribution-collections", "");
-        writeContigCountDistributionCollections(contigCountDistributionCollectionsDir, metadata, intervals);
+        final List<File> contigCountDistributionCollectionFiles =
+                writeContigCountDistributionCollections(contigCountDistributionCollectionsDir, metadata, intervals);
 
         //call python inference code
         final boolean pythonReturnCode = executeDeterminePloidyAndDepthPythonScript(
-                contigCountDistributionCollectionsDir, intervalsFile);
+                contigCountDistributionCollectionFiles, intervalsFile);
 
         if (!pythonReturnCode) {
             throw new UserException("Python return code was non-zero.");
@@ -312,11 +313,12 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         }
     }
 
-    private void writeContigCountDistributionCollections(final File contigCountDistributionCollectionsDir,
-                                                         final LocatableMetadata metadata,
-                                                         final List<SimpleInterval> intervals) {
+    private List<File> writeContigCountDistributionCollections(final File contigCountDistributionCollectionsDir,
+                                                               final LocatableMetadata metadata,
+                                                               final List<SimpleInterval> intervals) {
         logger.info("Validating and aggregating per-contig count distributions from input read-count files...");
         final int numSamples = inputReadCountFiles.size();
+        final List<File> contigCountDistributionCollectionFiles = new ArrayList<>(numSamples);
         final ListIterator<File> inputReadCountFilesIterator = inputReadCountFiles.listIterator();
         while (inputReadCountFilesIterator.hasNext()) {
             final int sampleIndex = inputReadCountFilesIterator.nextIndex();
@@ -333,20 +335,24 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
                     String.format("Intervals for read-count file %s do not match those in other " +
                             "read-count files.", inputReadCountFile));
             //calculate per-contig count distributions and write temporary file for this sample
-            new ContigCountDistributionCollection(readCounts, maximumCount)
-                    .write(new File(contigCountDistributionCollectionsDir, String.format("SAMPLE-%d.tsv", sampleIndex)));
+            final File contigCountDistributionCollectionFile =
+                    new File(contigCountDistributionCollectionsDir, String.format("SAMPLE-%d.tsv", sampleIndex));
+            new ContigCountDistributionCollection(readCounts, maximumCount).write(contigCountDistributionCollectionFile);
+            contigCountDistributionCollectionFiles.add(contigCountDistributionCollectionFile);
         }
+        return contigCountDistributionCollectionFiles;
     }
 
-    private boolean executeDeterminePloidyAndDepthPythonScript(final File contigCountDistributionCollectionsDir,
+    private boolean executeDeterminePloidyAndDepthPythonScript(final List<File> contigCountDistributionCollectionFiles,
                                                                final File intervalsFile) {
         final PythonScriptExecutor executor = new PythonScriptExecutor(true);
         final String outputDirArg = Utils.nonEmpty(outputDir).endsWith(File.separator)
                 ? outputDir
                 : outputDir + File.separator;    //add trailing slash if necessary
-        final List<String> arguments = new ArrayList<>(Arrays.asList(
-                "--contig_count_distribution_collections_path=" + contigCountDistributionCollectionsDir.getAbsolutePath(),
+        final List<String> arguments = new ArrayList<>(Collections.singletonList(
                 "--output_calls_path=" + outputDirArg + outputPrefix + CALLS_PATH_SUFFIX));
+        arguments.add("--contig_count_distribution_collection_files");
+        arguments.addAll(contigCountDistributionCollectionFiles.stream().map(File::getAbsolutePath).collect(Collectors.toList()));
         arguments.addAll(germlineContigPloidyModelArgumentCollection.generatePythonArguments(runMode));
         arguments.addAll(germlineContigPloidyHybridADVIArgumentCollection.generatePythonArguments());
 
