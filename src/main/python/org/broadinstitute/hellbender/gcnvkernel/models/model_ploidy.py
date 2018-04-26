@@ -78,9 +78,15 @@ class PloidyModelConfig:
         contigs: List[str] = []
         for i, contig_tuple in enumerate(contig_tuples):
             for contig_index, contig in enumerate(contig_tuple):
+                assert contig not in contigs, "Contig tuples must be disjoint."
+                contigs.append(contig)
                 ploidy_jk.append(np.array([ploidy_state[contig_index] for ploidy_state in ploidy_states_ik[i]]))
-                if contig not in contigs:
-                    contigs.append(contig)
+
+        print(ploidy_states_ik)
+        print(ploidy_state_priors_ik)
+        print(ploidy_jk)
+        print(contig_tuples)
+        print(contigs)
 
         return ploidy_states_ik, ploidy_state_priors_ik, ploidy_jk, contig_tuples, contigs
 
