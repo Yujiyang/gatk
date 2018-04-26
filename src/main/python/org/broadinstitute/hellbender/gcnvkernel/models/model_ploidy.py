@@ -63,8 +63,7 @@ class PloidyModelConfig:
         self.mosaicism_bias_scale = mosaicism_bias_scale
 
     @staticmethod
-    def _process_ploidy_state_priors_map(ploidy_state_priors_map: Dict[List[str], Dict[List[int], float]],
-                                         min_prob: float = 0) \
+    def _process_ploidy_state_priors_map(ploidy_state_priors_map: Dict[List[str], Dict[List[int], float]]) \
             -> Tuple[List[List[Tuple[int]]], List[np.ndarray], List[np.ndarray], List[Tuple[str]], List[str]]:
         contig_tuples: List[Tuple[str]] = list(ploidy_state_priors_map.keys())
 
@@ -82,12 +81,6 @@ class PloidyModelConfig:
                 ploidy_jk.append(np.array([ploidy_state[contig_index] for ploidy_state in ploidy_states_ik[i]]))
                 if contig not in contigs:
                     contigs.append(contig)
-
-        print(ploidy_states_ik)
-        print(ploidy_state_priors_ik)
-        print(ploidy_jk)
-        print(contig_tuples)
-        print(contigs)
 
         return ploidy_states_ik, ploidy_state_priors_ik, ploidy_jk, contig_tuples, contigs
 
