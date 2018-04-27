@@ -39,6 +39,7 @@ gcnvkernel.PloidyModelConfig.expose_args(
     parser,
     hide={
         "--ploidy_concentration_scale",
+        "--depth_upper_bound",
         "--error_rate_upper_bound",
         "--contig_bias_lower_bound",
         "--contig_bias_upper_bound",

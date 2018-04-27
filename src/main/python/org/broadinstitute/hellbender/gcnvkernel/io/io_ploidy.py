@@ -43,7 +43,7 @@ class PloidyModelWriter:
         io_commons.write_dict_to_json_file(
             os.path.join(self.output_path, io_consts.default_ploidy_config_json_filename),
             self.ploidy_config.__dict__,
-            {'contig_ploidy_prior_map', 'contig_set', 'num_ploidy_states'})
+            {'ploidy_states_ik', 'ploidy_state_priors_ik', 'ploidy_jk', 'contig_tuples', 'contigs'})
 
         # write global variables in the posterior
         for var_name in self.ploidy_model.global_var_registry:

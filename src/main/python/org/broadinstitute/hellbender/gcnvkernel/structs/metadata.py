@@ -52,17 +52,18 @@ class SampleCoverageMetadata:
 
     def __init__(self,
                  sample_name: str,
-                 n_jm: np.ndarray,
+                 hist_jm: np.ndarray,
                  contig_list: List[str]):
-        assert n_jm.ndim == 2
-        assert n_jm.shape[0] == len(contig_list)
+        assert hist_jm.ndim == 2
+        assert hist_jm.shape[0] == len(contig_list)
 
         self.sample_name = sample_name
         self.contig_list = contig_list
 
         # per-contig count distribution
         # j = contig index, m = count index
-        self.n_jm = n_jm.astype(types.med_uint)
+        self.hist_jm = hist_jm.astype(types.med_uint)
+        self.max_count = hist_jm.shape[1] - 1
 
         self._contig_map = {contig: j for j, contig in enumerate(contig_list)}
 
@@ -72,7 +73,7 @@ class SampleCoverageMetadata:
 
     def get_contig_count_distribution(self, contig: str):
         self._assert_contig_exists(contig)
-        return self.n_jm[self._contig_map[contig]]
+        return self.hist_jm[self._contig_map[contig]]
 
     # @staticmethod
     # def generate_sample_coverage_metadata(sample_name,
