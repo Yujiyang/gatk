@@ -195,14 +195,18 @@ class PloidyWorkspace:
         self.sample_names = sample_names
         self.num_samples: int = len(sample_names)
         self.max_count = sample_metadata_collection.get_sample_coverage_metadata(sample_names[0]).max_count
+        self.contig_to_index_map = {contig: index for index, contig in enumerate(ploidy_config.contigs)}
+
         assert all([contig in ploidy_config.contigs for contig in interval_list_metadata.contig_set]), \
             "Some contigs do not have ploidy priors"
         assert sample_metadata_collection.all_samples_have_coverage_metadata(sample_names), \
             "Some samples do not have coverage metadata"
 
-        # s = sample index, i = contig-tuple index, j = contig index, k = ploidy-state index, m = count index
-
         # create shared theano tensors
+        # s = sample index, i = contig-tuple index, j = contig index, k = ploidy-state index, m = count index
+        # lists indexed by k in the ploidy config are ragged
+        # (due to the differing number of ploidy states for each contig tuple)
+        # so we pad when necessary to create non-ragged tensors
 
         # count-distribution data
         hist_sjm = np.zeros((self.num_samples, self.num_contigs, self.max_count + 1), dtype=types.med_uint)
@@ -213,22 +217,19 @@ class PloidyWorkspace:
 
         self.mask_sjm = self._construct_mask(hist_sjm)
 
-        # ploidy priors (indexed by contig index and ploidy-state index)
-        p_ploidy_jk = np.zeros((self.num_contigs, self.ploidy_config.num_ploidy_states), dtype=types.floatX)
-        for j, contig in enumerate(interval_list_metadata.ordered_contig_list):
-            p_ploidy_jk[j, :] = ploidy_config.contig_ploidy_prior_map[contig][:]
-        log_p_ploidy_jk = np.log(p_ploidy_jk)
-        self.log_p_ploidy_jk: types.TensorSharedVariable = th.shared(log_p_ploidy_jk, name='log_p_ploidy_jk',
-                                                                     borrow=config.borrow_numpy)
+        num_ploidy_states_j = np.array([len(ploidy_k) for ploidy_k in ploidy_config.ploidy_jk])
+        self.max_num_ploidy_states = np.max(num_ploidy_states_j)
+        self.num_ploidy_states_j = th.shared(num_ploidy_states_j, name='num_ploidy_states_j',
+                                             borrow=config.borrow_numpy)
 
-        # ploidy log posteriors (initial value is immaterial)
-        log_q_ploidy_sjk = np.tile(log_p_ploidy_jk, (self.num_samples, 1, 1))
+        # ploidy log posteriors (initial value is immaterial
+        log_q_ploidy_sjk = np.zeros((self.num_samples, self.num_contigs, self.max_num_ploidy_states), dtype=types.floatX)
         self.log_q_ploidy_sjk: types.TensorSharedVariable = th.shared(
             log_q_ploidy_sjk, name='log_q_ploidy_sjk', borrow=config.borrow_numpy)
 
         # ploidy log emission (initial value is immaterial)
         log_ploidy_emission_sjk = np.zeros(
-            (self.num_samples, self.num_contigs, ploidy_config.num_ploidy_states), dtype=types.floatX)
+            (self.num_samples, self.num_contigs, self.max_num_ploidy_states), dtype=types.floatX)
         self.log_ploidy_emission_sjk: types.TensorSharedVariable = th.shared(
             log_ploidy_emission_sjk, name="log_ploidy_emission_sjk", borrow=config.borrow_numpy)
 
@@ -290,6 +291,7 @@ class PloidyModel(GeneralizedContinuousModel):
         num_samples = ploidy_workspace.num_samples
         num_contigs = ploidy_workspace.num_contigs
         max_count = ploidy_workspace.max_count
+        contig_to_index_map = ploidy_workspace.contig_to_index_map
         mask_sjm = ploidy_workspace.mask_sjm
         hist_sjm = ploidy_workspace.hist_sjm
         ploidy_states_ik = ploidy_config.ploidy_states_ik
@@ -303,7 +305,7 @@ class PloidyModel(GeneralizedContinuousModel):
         d_s = Uniform('d_s',
                       upper=depth_upper_bound,
                       shape=num_samples)
-        register_as_sample_specific(d_s)
+        register_as_sample_specific(d_s, sample_axis=0)
 
         b_j = Bound(Gamma,
                     lower=contig_bias_lower_bound,
@@ -311,6 +313,7 @@ class PloidyModel(GeneralizedContinuousModel):
                                                    alpha=contig_bias_scale,
                                                    beta=contig_bias_scale,
                                                    shape=num_contigs)
+        register_as_global(b_j)
         b_j_norm = Deterministic('b_j_norm', var=b_j / tt.mean(b_j))
         register_as_global(b_j_norm)
 
@@ -321,13 +324,15 @@ class PloidyModel(GeneralizedContinuousModel):
                                                        shape=(num_contigs, num_samples))
         register_as_sample_specific(f_js, sample_axis=1)
 
-        pi_i_sk = [Dirichlet('pi_%d_sk' % i,
+        pi_i_sk = [Dirichlet('pi_%s_sk' % str(contig_tuple),
                              a=ploidy_concentration_scale * ploidy_state_priors_ik[i],
                              shape=(num_samples, len(ploidy_states_ik[i])),
                              transform=pm.distributions.transforms.t_stick_breaking(eps))
-                   if len(contig_tuple) > 1 else pm.Deterministic('pi_%d_sk' % i, var=tt.ones((num_samples, 1)))
+                   if len(contig_tuple) > 1
+                   else pm.Deterministic('pi_%s_sk' % str(contig_tuple), var=tt.ones((num_samples, 1)))
                    for i, contig_tuple in enumerate(contig_tuples)]
-        register_as_sample_specific(pi_i_sk, sample_axis=0)
+        for i in range(len(contig_tuples)):
+            register_as_sample_specific(pi_i_sk[i], sample_axis=0)
 
         e_js = Uniform('e_js',
                        lower=0.,
@@ -342,6 +347,8 @@ class PloidyModel(GeneralizedContinuousModel):
         alpha_js = Uniform('alpha_js',
                            upper=10000.,
                            shape=(num_contigs, num_samples))
+        register_as_sample_specific(alpha_js, sample_axis=1)
+
         p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
                                                 alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
                           .logp(tt.arange(max_count + 1).dimshuffle('x', 'x', 0)))
@@ -354,9 +361,9 @@ class PloidyModel(GeneralizedContinuousModel):
                           for j in range(num_contigs)]
             return tt.sum(
                 [pm.math.logsumexp(
-                    mask_sjm[:, j, np.newaxis, :] * (tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[j]),
+                    mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * (tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]]),
                     axis=1)
-                    for i, contig_tuple in enumerate(contig_tuples) for j in contig_tuple])
+                    for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
         DensityDist(name='hist_sjm', logp=_logp_sjm, observed=hist_sjm)
 
@@ -412,7 +419,7 @@ class PloidyModel(GeneralizedContinuousModel):
         #             observed=n_sj)
 
         # for log ploidy emission sampling
-        Deterministic(name='logp_sjk', var=_get_logp_sjk(n_sj))
+        # Deterministic(name='logp_sjk', var=_get_logp_sjk(n_sj))
 
 
 class PloidyEmissionBasicSampler:
@@ -460,8 +467,7 @@ class PloidyBasicCaller:
 
     @th.configparser.change_flags(compute_test_value="off")
     def _get_update_log_q_ploidy_sjk_theano_func(self) -> th.compile.function_module.Function:
-        new_log_q_ploidy_sjk = (self.ploidy_workspace.log_p_ploidy_jk.dimshuffle('x', 0, 1)
-                                + self.ploidy_workspace.log_ploidy_emission_sjk)
+        new_log_q_ploidy_sjk = self.ploidy_workspace.log_ploidy_emission_sjk
         new_log_q_ploidy_sjk -= pm.logsumexp(new_log_q_ploidy_sjk, axis=2)
         old_log_q_ploidy_sjk = self.ploidy_workspace.log_q_ploidy_sjk
         admixed_new_log_q_ploidy_sjk = commons.safe_logaddexp(
