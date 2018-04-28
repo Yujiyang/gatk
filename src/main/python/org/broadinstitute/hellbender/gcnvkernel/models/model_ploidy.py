@@ -204,9 +204,6 @@ class PloidyWorkspace:
 
         # create shared theano tensors
         # s = sample index, i = contig-tuple index, j = contig index, k = ploidy-state index, m = count index
-        # lists indexed by k in the ploidy config are ragged
-        # (due to the differing number of ploidy states for each contig tuple)
-        # so we pad when necessary to create non-ragged tensors
 
         # count-distribution data
         hist_sjm = np.zeros((self.num_samples, self.num_contigs, self.max_count + 1), dtype=types.med_uint)
@@ -218,20 +215,18 @@ class PloidyWorkspace:
         self.mask_sjm = self._construct_mask(hist_sjm)
 
         num_ploidy_states_j = np.array([len(ploidy_k) for ploidy_k in ploidy_config.ploidy_jk])
-        self.max_num_ploidy_states = np.max(num_ploidy_states_j)
-        self.num_ploidy_states_j = th.shared(num_ploidy_states_j, name='num_ploidy_states_j',
-                                             borrow=config.borrow_numpy)
 
         # ploidy log posteriors (initial value is immaterial
-        log_q_ploidy_sjk = np.zeros((self.num_samples, self.num_contigs, self.max_num_ploidy_states), dtype=types.floatX)
-        self.log_q_ploidy_sjk: types.TensorSharedVariable = th.shared(
-            log_q_ploidy_sjk, name='log_q_ploidy_sjk', borrow=config.borrow_numpy)
+        self.log_q_ploidy_j_sk: List[types.TensorSharedVariable] = \
+            [th.shared(np.zeros((self.num_samples, num_ploidy_states_j[j]), dtype=types.floatX),
+                       name='log_q_ploidy_%s_sk' % contig, borrow=config.borrow_numpy)
+             for j, contig in enumerate(self.ploidy_config.contigs)]
 
         # ploidy log emission (initial value is immaterial)
-        log_ploidy_emission_sjk = np.zeros(
-            (self.num_samples, self.num_contigs, self.max_num_ploidy_states), dtype=types.floatX)
-        self.log_ploidy_emission_sjk: types.TensorSharedVariable = th.shared(
-            log_ploidy_emission_sjk, name="log_ploidy_emission_sjk", borrow=config.borrow_numpy)
+        self.log_ploidy_emission_j_sk: List[types.TensorSharedVariable] = \
+            [th.shared(np.zeros((self.num_samples, num_ploidy_states_j[j]), dtype=types.floatX),
+                       name='log_ploidy_emission_%s_sk' % contig, borrow=config.borrow_numpy)
+             for j, contig in enumerate(self.ploidy_config.contigs)]
 
     @staticmethod
     def _get_contig_set_from_interval_list(interval_list: List[Interval]) -> Set[str]:
@@ -349,77 +344,27 @@ class PloidyModel(GeneralizedContinuousModel):
                            shape=(num_contigs, num_samples))
         register_as_sample_specific(alpha_js, sample_axis=1)
 
-        p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-                                                alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
-                          .logp(tt.arange(max_count + 1).dimshuffle('x', 'x', 0)))
-                   for j in range(num_contigs)]
+        logp_j_skm = [NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+                                            alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
+                          .logp(tt.arange(max_count + 1).dimshuffle('x', 'x', 0))
+                      for j in range(num_contigs)]
 
         def _logp_sjm(_hist_sjm):
             num_occurrences_tot_sj = tt.sum(_hist_sjm * mask_sjm, axis=2)
-            logp_j_skm = [Poisson.dist(mu=num_occurrences_tot_sj[:, j].dimshuffle(0, 'x', 'x') * p_j_skm[j] + eps) \
-                              .logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
-                          for j in range(num_contigs)]
+            logp_hist_j_skm = [Poisson.dist(mu=num_occurrences_tot_sj[:, j].dimshuffle(0, 'x', 'x') * tt.exp(logp_j_skm[j]) + eps) \
+                                   .logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
+                               for j in range(num_contigs)]
             return tt.sum(
                 [pm.math.logsumexp(
-                    mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * (tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]]),
+                    mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * (tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]]),
                     axis=1)
                     for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
         DensityDist(name='hist_sjm', logp=_logp_sjm, observed=hist_sjm)
 
-        # # mean per-contig bias
-        # mean_bias_j = self.PositiveNormal('mean_bias_j',
-        #                                   mu=1.0,
-        #                                   sd=ploidy_config.mean_bias_sd,
-        #                                   shape=(ploidy_workspace.num_contigs,))
-        # register_as_global(mean_bias_j)
-        #
-        # # contig coverage unexplained variance
-        # psi_j = Exponential(name='psi_j',
-        #                     lam=1.0 / ploidy_config.psi_j_scale,
-        #                     shape=(ploidy_workspace.num_contigs,))
-        # register_as_global(psi_j)
-        #
-        # # sample-specific contig unexplained variance
-        # psi_s = Exponential(name='psi_s',
-        #                     lam=1.0 / ploidy_config.psi_j_scale,
-        #                     shape=(ploidy_workspace.num_samples,))
-        # register_as_sample_specific(psi_s, sample_axis=0)
-        #
-        # # convert "unexplained variance" to negative binomial over-dispersion
-        # alpha_sj = tt.inv((tt.exp(psi_j.dimshuffle('x', 0) + psi_s.dimshuffle(0, 'x')) - 1.0))
-        #
-        # # mean ploidy per contig per sample
-        # mean_ploidy_sj = tt.sum(tt.exp(ploidy_workspace.log_q_ploidy_sjk)
-        #                         * ploidy_workspace.int_ploidy_values_k.dimshuffle('x', 'x', 0), axis=2)
-        #
-        # # mean-field amplification coefficient per contig
-        # gamma_sj = mean_ploidy_sj * t_j.dimshuffle('x', 0) * mean_bias_j.dimshuffle('x', 0)
-        #
-        # # gamma_rest_sj \equiv sum_{j' \neq j} gamma_sj
-        # gamma_rest_sj = tt.dot(gamma_sj, contig_exclusion_mask_jj)
-        #
-        # # NB per-contig counts
-        # mu_num_sjk = (t_j.dimshuffle('x', 0, 'x') * mean_bias_j.dimshuffle('x', 0, 'x')
-        #               * ploidy_k.dimshuffle('x', 'x', 0))
-        # mu_den_sjk = gamma_rest_sj.dimshuffle(0, 1, 'x') + mu_num_sjk
-        # eps_j = eps * t_j / tt.sum(t_j)  # average number of reads erroneously mapped to contig j
-        # mu_sjk = ((1.0 - eps) * (mu_num_sjk / mu_den_sjk)
-        #           + eps_j.dimshuffle('x', 0, 'x')) * n_s.dimshuffle(0, 'x', 'x')
-        #
-        # def _get_logp_sjk(_n_sj):
-        #     _logp_sjk = commons.negative_binomial_logp(
-        #         mu_sjk,  # mean
-        #         alpha_sj.dimshuffle(0, 1, 'x'),  # over-dispersion
-        #         _n_sj.dimshuffle(0, 1, 'x'))  # contig counts
-        #     return _logp_sjk
-        #
-        # DensityDist(name='n_sj_obs',
-        #             logp=lambda _n_sj: tt.sum(q_ploidy_sjk * _get_logp_sjk(_n_sj)),
-        #             observed=n_sj)
-
         # for log ploidy emission sampling
-        # Deterministic(name='logp_sjk', var=_get_logp_sjk(n_sj))
+        for j, contig in enumerate(ploidy_config.contigs):
+            Deterministic(name='logp_%s_skm' % contig, var=logp_j_skm[j])
 
 
 class PloidyEmissionBasicSampler:
