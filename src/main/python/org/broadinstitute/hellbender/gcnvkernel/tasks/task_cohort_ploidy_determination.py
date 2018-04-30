@@ -68,18 +68,19 @@ class PloidyEmissionSampler(Sampler):
         return self.ploidy_emission_basic_sampler.draw()
 
     def reset(self):
-        self.ploidy_workspace.log_ploidy_emission_sjk.set_value(
-            np.zeros((self.ploidy_workspace.num_samples,
-                      self.ploidy_workspace.num_contigs,
-                      self.ploidy_workspace.num_ploidy_states),
-                     dtype=types.floatX), borrow=config.borrow_numpy)
+        for j, log_ploidy_emission_sk in enumerate(self.ploidy_workspace.log_ploidy_emission_j_sk):
+            log_ploidy_emission_sk.set_value(
+                np.zeros((self.ploidy_workspace.num_samples,
+                          self.ploidy_workspace.num_ploidy_states_j[j]),
+                         dtype=types.floatX), borrow=config.borrow_numpy)
 
     def increment(self, update):
-        self.ploidy_workspace.log_ploidy_emission_sjk.set_value(
-            self.ploidy_workspace.log_ploidy_emission_sjk.get_value(borrow=True) + update)
+        for j, log_ploidy_emission_sk in enumerate(self.ploidy_workspace.log_ploidy_emission_j_sk):
+            log_ploidy_emission_sk.set_value(log_ploidy_emission_sk.get_value(borrow=True) + update)
 
     def get_latest_log_emission_posterior_mean_estimator(self) -> np.ndarray:
-        return self.ploidy_workspace.log_ploidy_emission_sjk.get_value(borrow=True)
+        return np.array([log_ploidy_emission_sk.get_value(borrow=True)
+                         for log_ploidy_emission_sk in self.ploidy_workspace.log_ploidy_emission_j_sk])
 
 
 class CohortPloidyInferenceTask(HybridInferenceTask):

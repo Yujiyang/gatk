@@ -23,7 +23,8 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     private static final String SIMULATED_DATA_DIR = toolsTestDir + "copynumber/gcnv-sim-data/";
     private static final File PLOIDY_STATE_PRIORS_FILE =
             new File(SIMULATED_DATA_DIR, "ploidy_state_priors.tsv");
-    private static final List<File> COUNT_FILES = IntStream.range(0, 20)
+//    private static final List<File> COUNT_FILES = IntStream.range(0, 20)
+    private static final List<File> COUNT_FILES = IntStream.range(0, 5)
             .mapToObj(n -> new File(SIMULATED_DATA_DIR, String.format("SAMPLE_%03d_counts.tsv", n)))
             .collect(Collectors.toList());
     private static final File OUTPUT_DIR = createTempDir("test-ploidy");

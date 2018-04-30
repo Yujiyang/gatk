@@ -53,9 +53,7 @@ class PloidyModelConfig:
                                   mosaicism bias
         """
         assert ploidy_state_priors_map is not None
-        self.ploidy_states_ik, self.ploidy_state_priors_ik, self.ploidy_jk, self.contig_tuples, self.contigs = \
-            self._process_ploidy_state_priors_map(ploidy_state_priors_map)
-
+        self.ploidy_state_priors_map = ploidy_state_priors_map
         self.ploidy_concentration_scale = ploidy_concentration_scale
         self.depth_upper_bound = depth_upper_bound
         self.error_rate_upper_bound = error_rate_upper_bound
@@ -65,28 +63,6 @@ class PloidyModelConfig:
         self.mosaicism_bias_lower_bound = mosaicism_bias_lower_bound
         self.mosaicism_bias_upper_bound = mosaicism_bias_upper_bound
         self.mosaicism_bias_scale = mosaicism_bias_scale
-
-    @staticmethod
-    def _process_ploidy_state_priors_map(ploidy_state_priors_map: Dict[List[str], Dict[List[int], float]]) \
-            -> Tuple[List[List[Tuple[int]]], List[np.ndarray], List[np.ndarray], List[Tuple[str]], List[str]]:
-        contig_tuples: List[Tuple[str]] = list(ploidy_state_priors_map.keys())
-
-        # i = contig-tuple index, j = contig index, k = ploidy-state index
-        ploidy_states_ik: List[List[Tuple[int]]] = [list(ploidy_state_priors_map[contig_tuple].keys())
-                                                    for contig_tuple in contig_tuples]
-        ploidy_state_priors_ik: List[np.ndarray] = [np.fromiter(ploidy_state_priors_map[contig_tuple].values(),
-                                                                 dtype=float)
-                                                     for contig_tuple in contig_tuples]
-
-        ploidy_jk: List[np.ndarray] = []
-        contigs: List[str] = []
-        for i, contig_tuple in enumerate(contig_tuples):
-            for contig_index, contig in enumerate(contig_tuple):
-                assert contig not in contigs, "Contig tuples must be disjoint."
-                contigs.append(contig)
-                ploidy_jk.append(np.array([ploidy_state[contig_index] for ploidy_state in ploidy_states_ik[i]]))
-
-        return ploidy_states_ik, ploidy_state_priors_ik, ploidy_jk, contig_tuples, contigs
 
     @staticmethod
     def expose_args(args: argparse.ArgumentParser, hide: Set[str] = None):
@@ -188,16 +164,21 @@ class PloidyWorkspace:
                  interval_list_metadata: IntervalListMetadata,
                  sample_names: List[str],
                  sample_metadata_collection: SampleMetadataCollection):
-        self.interval_list_metadata = interval_list_metadata
-        self.sample_metadata_collection = sample_metadata_collection
         self.ploidy_config = ploidy_config
-        self.num_contigs = interval_list_metadata.num_contigs
+        self.interval_list_metadata = interval_list_metadata
         self.sample_names = sample_names
-        self.num_samples: int = len(sample_names)
-        self.max_count = sample_metadata_collection.get_sample_coverage_metadata(sample_names[0]).max_count
-        self.contig_to_index_map = {contig: index for index, contig in enumerate(ploidy_config.contigs)}
+        self.sample_metadata_collection = sample_metadata_collection
 
-        assert all([contig in ploidy_config.contigs for contig in interval_list_metadata.contig_set]), \
+        self.num_samples: int = len(sample_names)
+        self.num_contigs = interval_list_metadata.num_contigs
+        self.max_count = sample_metadata_collection.get_sample_coverage_metadata(sample_names[0]).max_count
+
+        self.ploidy_states_ik, self.ploidy_state_priors_ik, self.ploidy_jk, self.contig_tuples, self.contigs = \
+            self._process_ploidy_state_priors_map(ploidy_config.ploidy_state_priors_map)
+
+        self.contig_to_index_map = {contig: index for index, contig in enumerate(self.contigs)}
+
+        assert all([contig in self.contigs for contig in interval_list_metadata.contig_set]), \
             "Some contigs do not have ploidy priors"
         assert sample_metadata_collection.all_samples_have_coverage_metadata(sample_names), \
             "Some samples do not have coverage metadata"
@@ -214,23 +195,45 @@ class PloidyWorkspace:
 
         self.mask_sjm = self._construct_mask(hist_sjm)
 
-        num_ploidy_states_j = np.array([len(ploidy_k) for ploidy_k in ploidy_config.ploidy_jk])
+        self.num_ploidy_states_j = np.array([len(ploidy_k) for ploidy_k in self.ploidy_jk])
 
         # ploidy log posteriors (initial value is immaterial
         self.log_q_ploidy_j_sk: List[types.TensorSharedVariable] = \
-            [th.shared(np.zeros((self.num_samples, num_ploidy_states_j[j]), dtype=types.floatX),
+            [th.shared(np.zeros((self.num_samples, self.num_ploidy_states_j[j]), dtype=types.floatX),
                        name='log_q_ploidy_%s_sk' % contig, borrow=config.borrow_numpy)
-             for j, contig in enumerate(self.ploidy_config.contigs)]
+             for j, contig in enumerate(self.contigs)]
 
         # ploidy log emission (initial value is immaterial)
         self.log_ploidy_emission_j_sk: List[types.TensorSharedVariable] = \
-            [th.shared(np.zeros((self.num_samples, num_ploidy_states_j[j]), dtype=types.floatX),
+            [th.shared(np.zeros((self.num_samples, self.num_ploidy_states_j[j]), dtype=types.floatX),
                        name='log_ploidy_emission_%s_sk' % contig, borrow=config.borrow_numpy)
-             for j, contig in enumerate(self.ploidy_config.contigs)]
+             for j, contig in enumerate(self.contigs)]
 
     @staticmethod
     def _get_contig_set_from_interval_list(interval_list: List[Interval]) -> Set[str]:
         return {interval.contig for interval in interval_list}
+
+    @staticmethod
+    def _process_ploidy_state_priors_map(ploidy_state_priors_map: Dict[List[str], Dict[List[int], float]]) \
+            -> Tuple[List[List[Tuple[int]]], List[np.ndarray], List[np.ndarray], List[Tuple[str]], List[str]]:
+        contig_tuples: List[Tuple[str]] = list(ploidy_state_priors_map.keys())
+
+        # i = contig-tuple index, j = contig index, k = ploidy-state index
+        ploidy_states_ik: List[List[Tuple[int]]] = [list(ploidy_state_priors_map[contig_tuple].keys())
+                                                    for contig_tuple in contig_tuples]
+        ploidy_state_priors_ik: List[np.ndarray] = [np.fromiter(ploidy_state_priors_map[contig_tuple].values(),
+                                                                dtype=float)
+                                                    for contig_tuple in contig_tuples]
+
+        ploidy_jk: List[np.ndarray] = []
+        contigs: List[str] = []
+        for i, contig_tuple in enumerate(contig_tuples):
+            for contig_index, contig in enumerate(contig_tuple):
+                assert contig not in contigs, "Contig tuples must be disjoint."
+                contigs.append(contig)
+                ploidy_jk.append(np.array([ploidy_state[contig_index] for ploidy_state in ploidy_states_ik[i]]))
+
+        return ploidy_states_ik, ploidy_state_priors_ik, ploidy_jk, contig_tuples, contigs
 
     @staticmethod
     def _construct_mask(hist_sjm):
@@ -271,6 +274,8 @@ class PloidyModel(GeneralizedContinuousModel):
                  ploidy_config: PloidyModelConfig,
                  ploidy_workspace: PloidyWorkspace):
         super().__init__()
+        self.ploidy_config = ploidy_config
+        self.ploidy_workspace = ploidy_workspace
 
         # shorthands
         ploidy_concentration_scale = ploidy_config.ploidy_concentration_scale
@@ -282,16 +287,16 @@ class PloidyModel(GeneralizedContinuousModel):
         mosaicism_bias_lower_bound = ploidy_config.mosaicism_bias_lower_bound
         mosaicism_bias_upper_bound = ploidy_config.mosaicism_bias_upper_bound
         mosaicism_bias_scale = ploidy_config.mosaicism_bias_scale
-        contig_tuples = ploidy_config.contig_tuples
+        contig_tuples = ploidy_workspace.contig_tuples
         num_samples = ploidy_workspace.num_samples
         num_contigs = ploidy_workspace.num_contigs
         max_count = ploidy_workspace.max_count
         contig_to_index_map = ploidy_workspace.contig_to_index_map
         mask_sjm = ploidy_workspace.mask_sjm
         hist_sjm = ploidy_workspace.hist_sjm
-        ploidy_states_ik = ploidy_config.ploidy_states_ik
-        ploidy_state_priors_ik = ploidy_config.ploidy_state_priors_ik
-        ploidy_jk = ploidy_config.ploidy_jk
+        ploidy_states_ik = ploidy_workspace.ploidy_states_ik
+        ploidy_state_priors_ik = ploidy_workspace.ploidy_state_priors_ik
+        ploidy_jk = ploidy_workspace.ploidy_jk
         eps = self.epsilon
 
         register_as_global = self.register_as_global
@@ -347,7 +352,7 @@ class PloidyModel(GeneralizedContinuousModel):
         logp_j_skm = [NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
                                             alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
                           .logp(tt.arange(max_count + 1).dimshuffle('x', 'x', 0))
-                      for j in range(num_contigs)]
+                      for j, contig in enumerate(ploidy_workspace.contigs)]
 
         def _logp_sjm(_hist_sjm):
             num_occurrences_tot_sj = tt.sum(_hist_sjm * mask_sjm, axis=2)
@@ -363,8 +368,8 @@ class PloidyModel(GeneralizedContinuousModel):
         DensityDist(name='hist_sjm', logp=_logp_sjm, observed=hist_sjm)
 
         # for log ploidy emission sampling
-        for j, contig in enumerate(ploidy_config.contigs):
-            Deterministic(name='logp_%s_skm' % contig, var=logp_j_skm[j])
+        for j, contig in enumerate(ploidy_workspace.contigs):
+            Deterministic(name='logp_%s_sk' % contig, var=pm.math.logsumexp(logp_j_skm[j], axis=2))
 
 
 class PloidyEmissionBasicSampler:
@@ -396,9 +401,10 @@ class PloidyEmissionBasicSampler:
     def _get_compiled_simultaneous_log_ploidy_emission_sampler(self, approx: pm.approximations.MeanField):
         """For a given variational approximation, returns a compiled theano function that draws posterior samples
         from the log ploidy emission."""
-        log_ploidy_emission_sjk = commons.stochastic_node_mean_symbolic(
-            approx, self.ploidy_model['logp_sjk'], size=self.samples_per_round)
-        return th.function(inputs=[], outputs=log_ploidy_emission_sjk)
+        log_ploidy_emission_j_sk = [commons.stochastic_node_mean_symbolic(approx, self.ploidy_model['logp_%s_sk' % contig], size=self.samples_per_round)
+                                     for contig in self.ploidy_model.ploidy_workspace.contigs]
+
+        return th.function(inputs=[], outputs=log_ploidy_emission_j_sk)
 
 
 class PloidyBasicCaller:
@@ -408,20 +414,23 @@ class PloidyBasicCaller:
                  ploidy_workspace: PloidyWorkspace):
         self.ploidy_workspace = ploidy_workspace
         self.inference_params = inference_params
-        self._update_log_q_ploidy_sjk_theano_func = self._get_update_log_q_ploidy_sjk_theano_func()
+        self._update_log_q_ploidy_j_sk_theano_func = self._update_log_q_ploidy_j_sk_theano_func()
 
     @th.configparser.change_flags(compute_test_value="off")
-    def _get_update_log_q_ploidy_sjk_theano_func(self) -> th.compile.function_module.Function:
-        new_log_q_ploidy_sjk = self.ploidy_workspace.log_ploidy_emission_sjk
-        new_log_q_ploidy_sjk -= pm.logsumexp(new_log_q_ploidy_sjk, axis=2)
-        old_log_q_ploidy_sjk = self.ploidy_workspace.log_q_ploidy_sjk
-        admixed_new_log_q_ploidy_sjk = commons.safe_logaddexp(
-            new_log_q_ploidy_sjk + np.log(self.inference_params.caller_external_admixing_rate),
-            old_log_q_ploidy_sjk + np.log(1.0 - self.inference_params.caller_external_admixing_rate))
-        update_norm_sj = commons.get_hellinger_distance(admixed_new_log_q_ploidy_sjk, old_log_q_ploidy_sjk)
+    def _update_log_q_ploidy_j_sk_theano_func(self) -> th.compile.function_module.Function:
+        new_log_q_ploidy_j_sk = self.ploidy_workspace.log_ploidy_emission_j_sk
+        for new_log_q_ploidy_sk in new_log_q_ploidy_j_sk:
+            new_log_q_ploidy_sk -= pm.logsumexp(new_log_q_ploidy_sk, axis=1)
+        old_log_q_ploidy_j_sk = self.ploidy_workspace.log_q_ploidy_j_sk
+        admixed_new_log_q_ploidy_j_sk = [commons.safe_logaddexp(
+            new_log_q_ploidy_sk + np.log(self.inference_params.caller_external_admixing_rate),
+            old_log_q_ploidy_sk + np.log(1.0 - self.inference_params.caller_external_admixing_rate))
+            for new_log_q_ploidy_sk, old_log_q_ploidy_sk in zip(new_log_q_ploidy_j_sk, old_log_q_ploidy_j_sk)]
+        update_norm_j_s = [commons.get_hellinger_distance(admixed_new_log_q_ploidy_sk, old_log_q_ploidy_sk)
+                           for admixed_new_log_q_ploidy_sk, old_log_q_ploidy_sk in zip(admixed_new_log_q_ploidy_j_sk, old_log_q_ploidy_j_sk)]
         return th.function(inputs=[],
-                           outputs=[update_norm_sj],
-                           updates=[(self.ploidy_workspace.log_q_ploidy_sjk, admixed_new_log_q_ploidy_sjk)])
+                           outputs=update_norm_j_s,
+                           updates=list(zip(self.ploidy_workspace.log_q_ploidy_j_sk, admixed_new_log_q_ploidy_j_sk)))
 
-    def call(self) -> np.ndarray:
-        return self._update_log_q_ploidy_sjk_theano_func()
+    def call(self) -> List[np.ndarray]:
+        return self._update_log_q_ploidy_j_sk_theano_func()

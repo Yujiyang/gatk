@@ -105,22 +105,22 @@ if __name__ == "__main__":
                                                   sample_metadata_collection)
     ploidy_task = gcnvkernel.CohortPloidyInferenceTask(ploidy_inference_params, ploidy_config, ploidy_workspace)
 
-    # # go!
-    # ploidy_task.engage()
-    # ploidy_task.disengage()
-    #
-    # # save model parameters
-    # gcnvkernel.io_ploidy.PloidyModelWriter(ploidy_config, ploidy_workspace,
-    #                                        ploidy_task.continuous_model, ploidy_task.continuous_model_approx,
-    #                                        args.output_model_path)()
-    #
-    # # sample sample-specific posteriors
-    # gcnvkernel.io_ploidy.SamplePloidyWriter(ploidy_config, ploidy_workspace,
-    #                                         ploidy_task.continuous_model, ploidy_task.continuous_model_approx,
-    #                                         args.output_calls_path)()
-    #
-    # # save a copy of interval list and ploidy priors as well
-    # shutil.copy(args.interval_list,
-    #             os.path.join(args.output_model_path, gcnvkernel.io_consts.default_interval_list_filename))
-    # shutil.copy(args.contig_ploidy_prior_table,
-    #             os.path.join(args.output_model_path, gcnvkernel.io_consts.default_contig_ploidy_prior_tsv_filename))
+    # go!
+    ploidy_task.engage()
+    ploidy_task.disengage()
+
+    # save model parameters
+    gcnvkernel.io_ploidy.PloidyModelWriter(ploidy_config, ploidy_workspace,
+                                           ploidy_task.continuous_model, ploidy_task.continuous_model_approx,
+                                           args.output_model_path)()
+
+    # sample sample-specific posteriors
+    gcnvkernel.io_ploidy.SamplePloidyWriter(ploidy_config, ploidy_workspace,
+                                            ploidy_task.continuous_model, ploidy_task.continuous_model_approx,
+                                            args.output_calls_path)()
+
+    # save a copy of interval list and ploidy priors as well
+    shutil.copy(args.interval_list,
+                os.path.join(args.output_model_path, gcnvkernel.io_consts.default_interval_list_filename))
+    shutil.copy(args.contig_ploidy_prior_table,
+                os.path.join(args.output_model_path, gcnvkernel.io_consts.default_contig_ploidy_prior_tsv_filename))
