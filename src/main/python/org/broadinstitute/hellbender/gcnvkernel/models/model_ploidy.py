@@ -179,12 +179,12 @@ class PloidyWorkspace:
         # k = ploidy-state index, l = ploidy index (equal to ploidy), m = count index
 
         # process the ploidy-state priors map
-        self.contig_tuples: List[Tuple[str]] = list(ploidy_state_priors_map.keys())
+        self.contig_tuples: List[Tuple[str]] = list(self.ploidy_config.ploidy_state_priors_map.keys())
         self.ploidy_states_ik: List[List[Tuple[int]]] = \
-            [list(ploidy_config.ploidy_state_priors_map[contig_tuple].keys())
+            [list(self.ploidy_config.ploidy_state_priors_map[contig_tuple].keys())
              for contig_tuple in self.contig_tuples]
         self.ploidy_state_priors_ik: List[np.ndarray] = \
-            [np.fromiter(ploidy_config.ploidy_state_priors_map[contig_tuple].values(), dtype=float)
+            [np.fromiter(self.ploidy_config.ploidy_state_priors_map[contig_tuple].values(), dtype=types.floatX)
              for contig_tuple in self.contig_tuples]
         self.ploidy_jk: List[np.ndarray] = []
         self.contigs: List[str] = []
@@ -214,20 +214,20 @@ class PloidyWorkspace:
         self.num_ploidy_states_j = np.array([len(ploidy_k) for ploidy_k in self.ploidy_jk])
         self.max_num_ploidy_states = np.max(self.num_ploidy_states_j)
         self.max_ploidy = np.max([np.max(ploidy_k) for ploidy_k in self.ploidy_jk])
-        self.is_ploidy_in_ploidy_state_jkl = np.zeros((self.num_contigs, self.max_num_ploidy_states, self.max_ploidy),
+        self.is_ploidy_in_ploidy_state_jkl = np.zeros((self.num_contigs, self.max_num_ploidy_states, self.max_ploidy + 1),
                                                       dtype=types.small_uint)
         for j in range(self.num_contigs):
-            for k in self.num_ploidy_states_j[j]:
+            for k in range(self.num_ploidy_states_j[j]):
                 self.is_ploidy_in_ploidy_state_jkl[j][k][self.ploidy_jk[j][k]] = 1
 
         # ploidy log posteriors (initial value is immaterial
         self.log_q_ploidy_sjl: types.TensorSharedVariable = \
-            th.shared(np.zeros((self.num_samples, self.num_contigs, self.max_num_ploidy_states), dtype=types.floatX),
+            th.shared(np.zeros((self.num_samples, self.num_contigs, self.max_ploidy + 1), dtype=types.floatX),
                       name='log_q_ploidy_sjl', borrow=config.borrow_numpy)
 
         # ploidy log emission (initial value is immaterial)
         self.log_ploidy_emission_sjl: types.TensorSharedVariable = \
-            th.shared(np.zeros((self.num_samples, self.num_contigs, self.max_num_ploidy_states), dtype=types.floatX),
+            th.shared(np.zeros((self.num_samples, self.num_contigs, self.max_ploidy + 1), dtype=types.floatX),
                       name='log_ploidy_emission_sjl', borrow=config.borrow_numpy)
 
     @staticmethod
@@ -296,6 +296,8 @@ class PloidyModel(GeneralizedContinuousModel):
         ploidy_states_ik = ploidy_workspace.ploidy_states_ik
         ploidy_state_priors_ik = ploidy_workspace.ploidy_state_priors_ik
         ploidy_jk = ploidy_workspace.ploidy_jk
+        max_ploidy = self.ploidy_workspace.max_ploidy
+        is_ploidy_in_ploidy_state_jkl = self.ploidy_workspace.is_ploidy_in_ploidy_state_jkl
         eps = self.epsilon
 
         register_as_global = self.register_as_global
@@ -367,7 +369,14 @@ class PloidyModel(GeneralizedContinuousModel):
         DensityDist(name='hist_sjm', logp=_logp_sjm, observed=hist_sjm)
 
         # for ploidy log emission sampling
-        logp_sjl = #TODO
+        logp_sjl = tt.zeros((num_samples, num_contigs, max_ploidy + 1), dtype=types.floatX)
+        for s in range(num_samples):
+            for j in range(num_contigs):
+                logp_ml = pm.math.logsumexp(
+                    [logp_j_skm[j][s][k].dimshuffle(0, 'x') * is_ploidy_in_ploidy_state_jkl[j][k][np.newaxis, :]
+                     for k in range(self.ploidy_workspace.num_ploidy_states_j[j])],
+                    axis=0)                                                                         # logsumexp over k
+                tt.set_subtensor(logp_sjl[s, j], pm.math.logsumexp(logp_ml, axis=0), inplace=True)     # logsumexp over m
         Deterministic(name='logp_sjl', var=logp_sjl)
 
 
