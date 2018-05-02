@@ -360,24 +360,24 @@ class PloidyModel(GeneralizedContinuousModel):
                                           alpha=alpha_sj.dimshuffle(0, 1, 'x', 'x'))\
                         .logp(tt.arange(num_counts).dimshuffle('x', 'x', 'x', 0))
 
-        def _logp(_hist_sjm):
+        def _logp_hist_sjm(_hist_sjm):
             num_occurrences_tot_sj = tt.sum(_hist_sjm * mask_sjm, axis=2)
             logp_hist_sjkm = Poisson.dist(mu=num_occurrences_tot_sj.dimshuffle(0, 1, 'x', 'x') * \
-                                             tt.exp(logp_sjkm) + eps) \
-                                .logp(_hist_sjm.dimshuffle(0, 1, 'x', 2))
+                                         tt.exp(logp_sjkm) + eps) \
+                .logp(hist_sjm.dimshuffle(0, 1, 'x', 2))
             return tt.sum(
                 [pm.math.logsumexp(
                     mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * (tt.log(pi_sik[:, i, :, np.newaxis] + eps) + logp_hist_sjkm[:, contig_to_index_map[contig], :, :]),
                     axis=1)     # logsumexp over k
                     for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
-        DensityDist(name='hist_sjm', logp=_logp, observed=hist_sjm)
+        DensityDist(name='hist_sjm', logp=_logp_hist_sjm, observed=hist_sjm)
 
         # for ploidy log emission sampling
         logp_sjl = pm.math.logsumexp(tt.sum(
             logp_sjkm.dimshuffle(0, 1, 2, 'x', 3) * is_ploidy_in_ploidy_state_jkl[np.newaxis, :, :, :, np.newaxis],
-            axis=-1),   # sum over m
-            axis=2)     # logsumexp over k
+            axis=-1),               # sum over m
+            axis=2)[:, :, 0, :]     # logsumexp over k
         Deterministic(name='logp_sjl', var=logp_sjl)
 
 
@@ -410,8 +410,8 @@ class PloidyEmissionBasicSampler:
     def _get_compiled_simultaneous_log_ploidy_emission_sampler(self, approx: pm.approximations.MeanField):
         """For a given variational approximation, returns a compiled theano function that draws posterior samples
         from the log ploidy emission."""
-        log_ploidy_emission_sjl = commons.stochastic_node_mean_symbolic(approx, self.ploidy_model['logp_sjl'],
-                                                                        size=self.samples_per_round)
+        log_ploidy_emission_sjl = commons.stochastic_node_mean_symbolic(
+            approx, self.ploidy_model['logp_sjl'], size=self.samples_per_round)
         return th.function(inputs=[], outputs=log_ploidy_emission_sjl)
 
 
