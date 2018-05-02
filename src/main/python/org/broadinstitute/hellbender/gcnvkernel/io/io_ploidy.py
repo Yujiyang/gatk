@@ -43,7 +43,16 @@ class PloidyModelWriter:
         io_commons.write_dict_to_json_file(
             os.path.join(self.output_path, io_consts.default_ploidy_config_json_filename),
             self.ploidy_config.__dict__,
-            {'ploidy_states_ik', 'ploidy_state_priors_ik', 'ploidy_jk', 'contig_tuples', 'contigs'})
+            {'ploidy_state_priors_map',
+             'ploidy_concentration_scale',
+             'depth_upper_bound',
+             'error_rate_upper_bound',
+             'contig_bias_lower_bound',
+             'contig_bias_upper_bound',
+             'contig_bias_scale',
+             'mosaicism_bias_lower_bound',
+             'mosaicism_bias_upper_bound',
+             'mosaicism_bias_scale'})
 
         # write global variables in the posterior
         for var_name in self.ploidy_model.global_var_registry:
@@ -120,9 +129,9 @@ class SamplePloidyWriter:
             # find best contig ploidy calls and calculate ploidy genotyping quality
             ploidy_j = np.zeros((self.ploidy_workspace.num_contigs,), dtype=types.small_uint)
             ploidy_genotyping_quality_j = np.zeros((self.ploidy_workspace.num_contigs,), dtype=types.floatX)
-            log_q_ploidy_jk = self.ploidy_workspace.log_q_ploidy_sjk.get_value(borrow=True)[si, :, :]
+            log_q_ploidy_jl = self.ploidy_workspace.log_q_ploidy_sjl.get_value(borrow=True)[si, :, :]
             for j in range(self.ploidy_workspace.num_contigs):
-                ploidy_j[j], ploidy_genotyping_quality_j[j] = model_commons.perform_genotyping(log_q_ploidy_jk[j, :])
+                ploidy_j[j], ploidy_genotyping_quality_j[j] = model_commons.perform_genotyping(log_q_ploidy_jl[j, :])
 
             # generate sample ploidy metadata
             sample_ploidy_metadata = SamplePloidyMetadata(

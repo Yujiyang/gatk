@@ -1,14 +1,25 @@
 package org.broadinstitute.hellbender.tools.copynumber;
 
+import htsjdk.samtools.SAMSequenceDictionary;
+import htsjdk.samtools.SAMSequenceRecord;
+import org.apache.commons.math3.random.RandomDataGenerator;
 import org.broadinstitute.hellbender.CommandLineProgramTest;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.copynumber.arguments.CopyNumberStandardArgument;
+import org.broadinstitute.hellbender.tools.copynumber.formats.collections.SimpleCountCollection;
+import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.SimpleSampleLocatableMetadata;
+import org.broadinstitute.hellbender.tools.copynumber.formats.records.SimpleCount;
+import org.broadinstitute.hellbender.utils.SimpleInterval;
+import org.broadinstitute.hellbender.utils.Utils;
+import org.broadinstitute.hellbender.utils.param.ParamUtils;
 import org.broadinstitute.hellbender.utils.test.ArgumentsBuilder;
 import org.testng.annotations.Test;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
@@ -23,23 +34,145 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     private static final String SIMULATED_DATA_DIR = toolsTestDir + "copynumber/gcnv-sim-data/";
     private static final File PLOIDY_STATE_PRIORS_FILE =
             new File(SIMULATED_DATA_DIR, "ploidy_state_priors.tsv");
-//    private static final List<File> COUNT_FILES = IntStream.range(0, 20)
     private static final List<File> COUNT_FILES = IntStream.range(0, 5)
             .mapToObj(n -> new File(SIMULATED_DATA_DIR, String.format("SAMPLE_%03d_counts.tsv", n)))
             .collect(Collectors.toList());
     private static final File OUTPUT_DIR = createTempDir("test-ploidy");
 
+    private static final class PloidyProfile {
+        private final LinkedHashMap<String, Integer> contigToPloidyMap;
+
+        private PloidyProfile(final List<String> contigs,
+                              final List<Integer> ploidies) {
+            Utils.validateArg(contigs.size() == ploidies.size(),
+                    "Number of contigs and number of ploidies must be equal.");
+            Utils.validateArg(contigs.stream().noneMatch(String::isEmpty),
+                    "Contig names cannot be empty.");
+            Utils.validateArg(ploidies.stream().allMatch(p -> p >= 0),
+                    "Ploidies must be non-negative.");
+            contigToPloidyMap = new LinkedHashMap<>(contigs.size());
+            IntStream.range(0, contigs.size())
+                    .forEach(i -> contigToPloidyMap.put(contigs.get(i), ploidies.get(i)));
+        }
+
+        public List<String> getContigs() {
+            return new ArrayList<>(contigToPloidyMap.keySet());
+        }
+
+        public int getPloidy(final String contig) {
+            return contigToPloidyMap.get(contig);
+        }
+    }
+
+    private static final class SimulatedData {
+        private static final int RANDOM_SEED = 1;
+        private static final double MAPPING_ERROR = 0.01;
+
+        private final List<PloidyProfile> ploidyProfiles;
+        private final List<SimpleCountCollection> countCollections;
+
+        private SimulatedData(final List<PloidyProfile> ploidyProfiles,
+                              final double averageDepth,
+                              final int numIntervalsPerContig) {
+            this.ploidyProfiles = Utils.nonEmpty(ploidyProfiles);
+            ParamUtils.isPositive(averageDepth, "Average depth must be positive.");
+            ParamUtils.isPositive(numIntervalsPerContig, "Number of intervals per contig must be positive.");
+            Utils.validateArg(ploidyProfiles.stream().map(PloidyProfile::getContigs).distinct().count() == 1,
+                    "Ploidy profiles must all have same contigs.");
+
+            final SAMSequenceDictionary sequenceDictionary = new SAMSequenceDictionary(
+                    ploidyProfiles.get(0).getContigs().stream()
+                            .map(c -> new SAMSequenceRecord(c, numIntervalsPerContig + 1))
+                            .collect(Collectors.toList()));
+
+            final RandomDataGenerator rng = new RandomDataGenerator();
+            rng.reSeed(RANDOM_SEED);
+            countCollections = IntStream.range(0, ploidyProfiles.size()).boxed()
+                    .map(i -> generateCounts(
+                            new SimpleSampleLocatableMetadata(String.format("sample_%d", i), sequenceDictionary),
+                            ploidyProfiles.get(i), averageDepth, numIntervalsPerContig, rng))
+                    .collect(Collectors.toList());
+        }
+
+        private List<File> writeCountFiles() {
+            final List<File> countFiles = new ArrayList<>(countCollections.size());
+            countCollections.forEach(c -> {
+                final File outputFile = createTempFile(c.getMetadata().getSampleName(), ".tsv");
+                c.write(outputFile);
+                countFiles.add(outputFile);
+            });
+            return countFiles;
+        }
+
+        private static SimpleCountCollection generateCounts(final SimpleSampleLocatableMetadata metadata,
+                                                            final PloidyProfile ploidyProfile,
+                                                            final double averageDepth,
+                                                            final int numIntervalsPerContig,
+                                                            final RandomDataGenerator rng) {
+            final List<SimpleCount> counts = ploidyProfile.getContigs().stream()
+                    .map(c -> IntStream.range(1, numIntervalsPerContig + 1).boxed()
+                            .map(i -> new SimpleCount(
+                                    new SimpleInterval(c, i, i),
+                                    (int) rng.nextPoisson(Math.max(ploidyProfile.getPloidy(c), MAPPING_ERROR) * averageDepth)))
+                            .collect(Collectors.toList()))
+                    .flatMap(List::stream)
+                    .collect(Collectors.toList());
+            return new SimpleCountCollection(metadata, counts);
+        }
+    }
+
     @Test(groups = {"python"})
     public void testCohort() {
+        final List<String> contigs = Arrays.asList("1", "2", "3", "4", "5", "X", "Y");
+        final SimulatedData simulatedData = new SimulatedData(
+                Arrays.asList(
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 1)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 3, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 3, 2, 2, 1, 1))
+                ),
+                100.,
+                10000);
+        final List<File> countFiles = simulatedData.writeCountFiles();
+
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        COUNT_FILES.forEach(argsBuilder::addInput);
+        countFiles.forEach(argsBuilder::addInput);
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
-                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
+//                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
+                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/BROAD.MIT.EDU/slee/working/gatk/test_files")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
+
+//    @Test(groups = {"python"})
+//    public void testCohort() {
+//        final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
+//        COUNT_FILES.forEach(argsBuilder::addInput);
+//        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
+//                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
+//                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
+//                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
+//                .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
+//        runCommandLine(argsBuilder);
+//    }
 
     @Test(groups = {"python"}, expectedExceptions = UserException.BadInput.class)
     public void testCohortWithoutContigPloidyPriors() {

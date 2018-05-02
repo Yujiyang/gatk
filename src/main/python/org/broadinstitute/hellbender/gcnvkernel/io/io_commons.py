@@ -82,12 +82,12 @@ def assert_output_path_writable(output_path: str,
     """
     if os.path.exists(output_path):
         if not os.path.isdir(output_path):
-            raise IOError("The provided output path \"{0}\" is not a directory")
+            raise IOError("The provided output path \"{0}\" is not a directory".format(output_path))
     elif try_creating_output_path:
         try:
             os.makedirs(output_path)
         except IOError:
-            raise IOError("The provided output path \"{0}\" does not exist and can not be created")
+            raise IOError("The provided output path \"{0}\" does not exist and can not be created".format(output_path))
     tmp_prefix = "write_tester"
     count = 0
     filename = os.path.join(output_path, tmp_prefix)

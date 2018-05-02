@@ -1,7 +1,7 @@
 import os
 
 # set theano flags
-os.environ["THEANO_FLAGS"] = "device=cpu,floatX=float64,optimizer=fast_run,compute_test_value=ignore,openmp=true"
+os.environ["THEANO_FLAGS"] = "device=cpu,floatX=float64,optimizer=fast_run,compute_test_value=ignore,openmp=true,exception_verbosity=high"
 
 import argparse
 import gcnvkernel
@@ -122,5 +122,5 @@ if __name__ == "__main__":
     # save a copy of interval list and ploidy priors as well
     shutil.copy(args.interval_list,
                 os.path.join(args.output_model_path, gcnvkernel.io_consts.default_interval_list_filename))
-    shutil.copy(args.contig_ploidy_prior_table,
+    shutil.copy(args.ploidy_state_priors_table,
                 os.path.join(args.output_model_path, gcnvkernel.io_consts.default_contig_ploidy_prior_tsv_filename))
