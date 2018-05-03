@@ -242,7 +242,7 @@ class PloidyWorkspace:
         mask_sjm, self.counts_m = self._construct_mask(hist_sjm)
         self.mask_sjm = mask_sjm[:, :, self.counts_m]
 
-        average_ploidy = np.mean([np.sum(contig_tuple) for contig_tuple in self.contig_tuples])
+        average_ploidy = 2. # TODO
         self.d_s_testval = np.median(np.sum(hist_sjm * np.arange(hist_sjm.shape[2]), axis=-1) / np.sum(hist_sjm, axis=-1), axis=-1) / average_ploidy
 
         self.hist_sjm : types.TensorSharedVariable = \
