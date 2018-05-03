@@ -242,6 +242,9 @@ class PloidyWorkspace:
         mask_sjm, self.counts_m = self._construct_mask(hist_sjm)
         self.mask_sjm = mask_sjm[:, :, self.counts_m]
 
+        average_ploidy = np.mean([np.sum(contig_tuple) for contig_tuple in self.contig_tuples])
+        self.d_s_testval = np.median(np.sum(hist_sjm * np.arange(hist_sjm.shape[2]), axis=-1) / np.sum(hist_sjm, axis=-1), axis=-1) / average_ploidy
+
         self.hist_sjm : types.TensorSharedVariable = \
             th.shared(hist_sjm[:, :, self.counts_m], name='hist_sjm', borrow=config.borrow_numpy)
 
@@ -287,7 +290,7 @@ class PloidyWorkspace:
         mask_sjm = np.full(np.shape(hist_sjm), False)
         for s in range(np.shape(hist_sjm)[0]):
             for j in range(np.shape(hist_sjm)[1]):
-                min_sj = np.argmin(hist_sjm[s, j, :mode_sj[s, j]])
+                min_sj = np.argmin(hist_sjm[s, j, :mode_sj[s, j] + 1])
                 if mode_sj[s, j] <= 10:
                     mode_sj[s, j] = 0
                     cutoff = 0.
@@ -351,6 +354,8 @@ class PloidyModel(GeneralizedContinuousModel):
         max_num_ploidy_states = self.ploidy_workspace.max_num_ploidy_states
         is_contig_in_contig_tuple_ij = self.ploidy_workspace.is_contig_in_contig_tuple_ij
         is_ploidy_in_ploidy_state_jkl = self.ploidy_workspace.is_ploidy_in_ploidy_state_jkl
+        num_ploidies = self.ploidy_workspace.num_ploidies
+        d_s_testval = self.ploidy_workspace.d_s_testval
         eps = self.epsilon
 
         register_as_global = self.register_as_global
@@ -358,7 +363,8 @@ class PloidyModel(GeneralizedContinuousModel):
 
         d_s = Uniform('d_s',
                       upper=depth_upper_bound,
-                      shape=num_samples)
+                      shape=num_samples,
+                      testval=d_s_testval)
         register_as_sample_specific(d_s, sample_axis=0)
 
         b_j = Bound(Gamma,
@@ -402,24 +408,30 @@ class PloidyModel(GeneralizedContinuousModel):
                                           alpha=alpha_sj.dimshuffle(0, 1, 'x', 'x')) \
                         .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 'x', 0))
 
-        def _logp_hist_sjm(_hist_sjm):
+        def _logp_hist_sijkm(_hist_sjm):
             num_occurrences_tot_sj = tt.sum(_hist_sjm * mask_sjm, axis=2)
             logp_hist_sjkm = Poisson.dist(mu=num_occurrences_tot_sj.dimshuffle(0, 1, 'x', 'x') * \
                                          tt.exp(logp_sjkm) + eps) \
                 .logp(_hist_sjm.dimshuffle(0, 1, 'x', 2))
-            return tt.sum(
-                pm.math.logsumexp(
-                    mask_sjm[:, np.newaxis, :, np.newaxis, :] *
-                    is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] *
-                    (tt.log(pi_sik[:, :, np.newaxis, :, np.newaxis] + eps) + logp_hist_sjkm[:, np.newaxis, :, :, :]),   #sijkm
-                    axis=3)[:, :, :, 0, :],  # logsumexp over k
-                axis=1)     # sum over i
+            return mask_sjm[:, np.newaxis, :, np.newaxis, :] * \
+                   is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] * \
+                   (tt.log(pi_sik[:, :, np.newaxis, :, np.newaxis] + eps) + logp_hist_sjkm[:, np.newaxis, :, :, :])
 
-        DensityDist(name='hist_sjm', logp=_logp_hist_sjm(hist_sjm), observed=hist_sjm)
+        DensityDist(name='hist_sjm',
+                    logp=lambda _hist_sjm: tt.sum(pm.logsumexp(_logp_hist_sijkm(_hist_sjm), axis=-2), axis=1),
+                    observed=hist_sjm)
 
         # for ploidy log emission sampling
-        # TODO
-        Deterministic(name='logp_sjl', var=tt.sum(_logp_hist_sjm(hist_sjm), axis=-1))
+        # logp_sjl = np.log(tt.sum(tt.sum(
+        #     (pi_sik[:, :, np.newaxis, :, np.newaxis] *
+        #     is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] *
+        #     is_ploidy_in_ploidy_state_jkl[np.newaxis, np.newaxis, :, :, :] +
+        #      eps),
+        #     axis=1), axis=-2))
+        logp_sjl = tt.sum(tt.sum(tt.sum(
+            _logp_hist_sijkm(hist_sjm)[:, :, :, :, np.newaxis, :] * (is_ploidy_in_ploidy_state_jkl[np.newaxis, np.newaxis, :, :, :, np.newaxis] + eps),
+            axis=1), axis=-3), axis=-1)
+        Deterministic(name='logp_sjl', var=logp_sjl)
 
 
 class PloidyEmissionBasicSampler:

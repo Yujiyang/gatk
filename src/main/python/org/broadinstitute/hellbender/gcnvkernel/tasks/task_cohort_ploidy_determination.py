@@ -19,6 +19,7 @@ class PloidyCaller(Caller):
                  ploidy_workspace: PloidyWorkspace):
         self.hybrid_inference_params = hybrid_inference_params
         self.ploidy_basic_caller = PloidyBasicCaller(hybrid_inference_params, ploidy_workspace)
+        self.ploidy_workspace = ploidy_workspace
 
     def snapshot(self):
         """Snapshot is not necessary since there is no internal consistency loop."""
@@ -30,6 +31,7 @@ class PloidyCaller(Caller):
 
     def call(self) -> 'PloidyCallerUpdateSummary':
         update_norm_sj = self.ploidy_basic_caller.call()
+        print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl.get_value(borrow=True)))
         return PloidyCallerUpdateSummary(
             update_norm_sj, self.hybrid_inference_params.caller_summary_statistics_reducer)
 
