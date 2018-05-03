@@ -31,7 +31,9 @@ class PloidyCaller(Caller):
 
     def call(self) -> 'PloidyCallerUpdateSummary':
         update_norm_sj = self.ploidy_basic_caller.call()
-        print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl.get_value(borrow=True)))
+        q_ploidy_sjl = np.exp(self.ploidy_workspace.log_q_ploidy_sjl.get_value(borrow=True))
+        for s, q_ploidy_jl in enumerate(q_ploidy_sjl):
+            print('sample_{0}:'.format(s), np.argmax(q_ploidy_jl, axis=1))
         return PloidyCallerUpdateSummary(
             update_norm_sj, self.hybrid_inference_params.caller_summary_statistics_reducer)
 
