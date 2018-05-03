@@ -55,11 +55,11 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                     .forEach(i -> contigToPloidyMap.put(contigs.get(i), ploidies.get(i)));
         }
 
-        public List<String> getContigs() {
+        private List<String> getContigs() {
             return new ArrayList<>(contigToPloidyMap.keySet());
         }
 
-        public int getPloidy(final String contig) {
+        private int getPloidy(final String contig) {
             return contigToPloidyMap.get(contig);
         }
     }
@@ -126,6 +126,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         final List<String> contigs = Arrays.asList("1", "2", "3", "4", "5", "X", "Y");
         final SimulatedData simulatedData = new SimulatedData(
                 Arrays.asList(
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 3, 2, 1, 1)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
@@ -134,18 +135,17 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 1)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 3, 2, 2, 2, 2, 0)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 1)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 3, 0)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 2)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 1, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 3, 2, 2, 1, 1))
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 2, 1)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 2, 2, 3, 0))
                 ),
                 100.,
                 10000);
@@ -155,7 +155,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         countFiles.forEach(argsBuilder::addInput);
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
 //                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
-                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/BROAD.MIT.EDU/slee/working/gatk/test_files")
+                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
