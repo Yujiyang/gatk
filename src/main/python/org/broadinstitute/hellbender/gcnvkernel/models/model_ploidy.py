@@ -406,6 +406,8 @@ class PloidyModel(GeneralizedContinuousModel):
                            testval=ploidy_state_priors_ik[np.newaxis, :, :])
         register_as_sample_specific(pi_sik, sample_axis=0)
 
+        pi_sjk = tt.sum(pi_sik[:, :, np.newaxis, :] * is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis], axis=1)
+
         e_sj = Uniform('e_sj',
                        lower=0.,
                        upper=error_rate_upper_bound,
@@ -434,14 +436,10 @@ class PloidyModel(GeneralizedContinuousModel):
             # logp_hist_sjkm = Poisson.dist(mu=num_occurrences_tot_sj.dimshuffle(0, 1, 'x', 'x') * \
             #                              tt.exp(logp_sjkm) + eps) \
             #     .logp(_hist_sjm.dimshuffle(0, 1, 'x', 2))
-            # return mask_sjm[:, np.newaxis, :, np.newaxis, :] * \
-            #        is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] * \
-            #        (tt.log(pi_sik[:, :, np.newaxis, :, np.newaxis] + eps) + logp_hist_sjkm[:, np.newaxis, :, :, :])
-            return tt.sum(
-                mask_sjm[:, np.newaxis, :, np.newaxis, :] * _hist_sjm[:, np.newaxis, :, np.newaxis, :] * \
-                is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] * \
-                (tt.log(pi_sik[:, :, np.newaxis, :, np.newaxis] + eps) + logp_sjkm[:, np.newaxis, :, :, :]),
-                axis=1)
+            # return mask_sjm[:, :, np.newaxis, :] * \
+            #        (tt.log(pi_sjk[:, :, :, np.newaxis] + eps) + logp_hist_sjkm)
+            return mask_sjm[:, :, np.newaxis, :] * _hist_sjm[:, :, np.newaxis, :] * \
+                   (tt.log(pi_sjk[:, :, :, np.newaxis] + eps) + logp_sjkm)
 
         DensityDist(name='hist_sjm',
                     logp=lambda _hist_sjm: pm.logsumexp(_logp_hist_sjkm(_hist_sjm), axis=-2),
@@ -454,9 +452,9 @@ class PloidyModel(GeneralizedContinuousModel):
         #     is_ploidy_in_ploidy_state_jkl[np.newaxis, np.newaxis, :, :, :] +
         #      eps),
         #     axis=1), axis=-2))
-        logp_sjl = tt.sum(tt.sum(
-            _logp_hist_sjkm(hist_sjm)[:, :, :, np.newaxis, :] * (is_ploidy_in_ploidy_state_jkl[np.newaxis, :, :, :, np.newaxis] + eps),
-            axis=-3), axis=-1)
+        logp_sjl = tt.sum(tt.sum(_logp_hist_sjkm(hist_sjm), axis=-1)[:, :, :, np.newaxis] *
+                          (is_ploidy_in_ploidy_state_jkl[np.newaxis, :, :, :] + eps),
+                          axis=-2)
         Deterministic(name='logp_sjl', var=logp_sjl)
 
 
