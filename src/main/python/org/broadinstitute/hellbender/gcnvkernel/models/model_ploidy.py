@@ -1,13 +1,12 @@
 import argparse
 import inspect
 import logging
-from typing import List, Dict, Set, Tuple
 
 import numpy as np
 import pymc3 as pm
 import theano as th
 import theano.tensor as tt
-from pymc3 import Normal, Deterministic, DensityDist, Dirichlet, Bound, Uniform, NegativeBinomial, Poisson, Gamma
+from pymc3 import Normal, Deterministic, DensityDist, Dirichlet, Bound, Uniform, NegativeBinomial, Poisson, Gamma, Exponential
 from typing import List, Dict, Set, Tuple
 
 from . import commons
@@ -264,6 +263,23 @@ class PloidyWorkspace:
             fig.tight_layout(pad=0.1)
             fig.savefig('/home/slee/working/gatk/test_files/sample_{0}.png'.format(s))
 
+        print("ploidy_states_i_k")
+        print(self.ploidy_states_i_k)
+        print("ploidy_j_k")
+        print(self.ploidy_j_k)
+        print("ploidy_state_priors_ik")
+        print(self.ploidy_state_priors_ik)
+        print("is_contig_in_contig_tuple_ij")
+        print(self.is_contig_in_contig_tuple_ij)
+        print("is_ploidy_in_ploidy_state_jkl")
+        print(self.is_ploidy_in_ploidy_state_jkl)
+        print("ploidy_jk")
+        print(self.ploidy_jk)
+        print("ploidy_state_priors_ik")
+        print(self.ploidy_state_priors_ik)
+        print("ploidy_priors_jl")
+        print(self.ploidy_priors_jl)
+
         # ploidy log priors
         self.log_p_ploidy_jl: types.TensorSharedVariable = \
             th.shared(np.log(self.ploidy_priors_jl),
@@ -386,7 +402,8 @@ class PloidyModel(GeneralizedContinuousModel):
         pi_sik = Dirichlet('pi_sik',
                            a=ploidy_concentration_scale * ploidy_state_priors_ik,
                            shape=(num_samples, num_contig_tuples, max_num_ploidy_states),
-                           transform=pm.distributions.transforms.t_stick_breaking(eps))
+                           transform=pm.distributions.transforms.t_stick_breaking(eps),
+                           testval=ploidy_state_priors_ik[np.newaxis, :, :])
         register_as_sample_specific(pi_sik, sample_axis=0)
 
         e_sj = Uniform('e_sj',
@@ -396,26 +413,33 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_sample_specific(e_sj, sample_axis=0)
 
         mu_sjk = d_s.dimshuffle(0, 'x', 'x') * b_j_norm.dimshuffle('x', 0, 'x') * \
-                 (tt.maximum(ploidy_jk[np.newaxis, :, :] + f_sj.dimshuffle(0, 1, 'x') * (ploidy_jk[np.newaxis, :, :] > 0),
-                               e_sj.dimshuffle(0, 1, 'x')))
-                # tt.maximum(ploidy_jk[np.newaxis, :, :], e_sj.dimshuffle(0, 1, 'x'))
-        alpha_sj = Uniform('alpha_sj',
-                           upper=10000.,
-                           shape=(num_samples, num_contigs))
-        register_as_sample_specific(alpha_sj, sample_axis=0)
+                 tt.maximum(ploidy_jk[np.newaxis, :, :], e_sj.dimshuffle(0, 1, 'x'))
+                 # (tt.maximum(ploidy_jk[np.newaxis, :, :] + f_sj.dimshuffle(0, 1, 'x') * (ploidy_jk[np.newaxis, :, :] > 0),
+                 #               e_sj.dimshuffle(0, 1, 'x')))
+
+        psi_sj = Exponential(name='psi_sj',
+                             lam=100.0, #1.0 / ploidy_config.psi_scale,
+                             shape=(num_samples, num_contigs))
+        register_as_sample_specific(psi_sj, sample_axis=0)
+        alpha_sj = tt.inv((tt.exp(psi_sj) - 1.0))
 
         logp_sjkm = NegativeBinomial.dist(mu=mu_sjk.dimshuffle(0, 1, 2, 'x') + eps,
                                           alpha=alpha_sj.dimshuffle(0, 1, 'x', 'x')) \
                         .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 'x', 0))
+        # logp_sjkm = Poisson.dist(mu=mu_sjk.dimshuffle(0, 1, 2, 'x') + eps) \
+        #     .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 'x', 0))
 
         def _logp_hist_sijkm(_hist_sjm):
-            num_occurrences_tot_sj = tt.sum(_hist_sjm * mask_sjm, axis=2)
-            logp_hist_sjkm = Poisson.dist(mu=num_occurrences_tot_sj.dimshuffle(0, 1, 'x', 'x') * \
-                                         tt.exp(logp_sjkm) + eps) \
-                .logp(_hist_sjm.dimshuffle(0, 1, 'x', 2))
-            return mask_sjm[:, np.newaxis, :, np.newaxis, :] * \
+            # num_occurrences_tot_sj = tt.sum(_hist_sjm * mask_sjm, axis=2)
+            # logp_hist_sjkm = Poisson.dist(mu=num_occurrences_tot_sj.dimshuffle(0, 1, 'x', 'x') * \
+            #                              tt.exp(logp_sjkm) + eps) \
+            #     .logp(_hist_sjm.dimshuffle(0, 1, 'x', 2))
+            # return mask_sjm[:, np.newaxis, :, np.newaxis, :] * \
+            #        is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] * \
+            #        (tt.log(pi_sik[:, :, np.newaxis, :, np.newaxis] + eps) + logp_hist_sjkm[:, np.newaxis, :, :, :])
+            return mask_sjm[:, np.newaxis, :, np.newaxis, :] * _hist_sjm[:, np.newaxis, :, np.newaxis, :] * \
                    is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] * \
-                   (tt.log(pi_sik[:, :, np.newaxis, :, np.newaxis] + eps) + logp_hist_sjkm[:, np.newaxis, :, :, :])
+                   (tt.log(pi_sik[:, :, np.newaxis, :, np.newaxis] + eps) + logp_sjkm[:, np.newaxis, :, :, :])
 
         DensityDist(name='hist_sjm',
                     logp=lambda _hist_sjm: tt.sum(pm.logsumexp(_logp_hist_sijkm(_hist_sjm), axis=-2), axis=1),

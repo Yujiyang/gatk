@@ -34,9 +34,67 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     private static final String SIMULATED_DATA_DIR = toolsTestDir + "copynumber/gcnv-sim-data/";
     private static final File PLOIDY_STATE_PRIORS_FILE =
             new File(SIMULATED_DATA_DIR, "ploidy_state_priors.tsv");
-    private static final List<File> COUNT_FILES = IntStream.range(0, 5)
-            .mapToObj(n -> new File(SIMULATED_DATA_DIR, String.format("SAMPLE_%03d_counts.tsv", n)))
-            .collect(Collectors.toList());
+    private static final List<File> COUNT_FILES = Arrays.asList(
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/10C110552.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/10C112547.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/11C119003.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/11C120584.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/11C122687.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/8007540246.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/8007540249.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/8007540504.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/8007540650.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/8007540842.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/8007543000.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/A-WCAP-WC000799-BL-COL-50949BL1.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/Ger_2392.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/Ger_2791.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/Ger_3154.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/Ger_3277.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/Ger_907.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/MH0129914.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/MH0136494.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/MH0143011.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/NWD146665.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/NWD208455.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/NWD394702.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/NWD411318.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/NWD490973.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/NWD586820.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/NWD744200.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/NWD789325.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/NWD847295.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/NWD932860.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/UK568-5.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/UK75-2.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/V11538.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/V4-2446.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/V4-2807.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/V4-3438.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/V4-3597.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/VIR_1025.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/VIR_1861.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/cases/VIR_2657.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540135.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540159.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540160.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540172.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540173.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540177.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540185.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540189.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540194.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540206.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540235.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540251.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540264.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540273.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540275.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540285.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540288.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540306.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540325.cram.counts.hdf5"),
+            new File("/media/slee/Storage/working/aneuploidy-samples/panel/8007540328.cram.counts.hdf5"));
     private static final File OUTPUT_DIR = createTempDir("test-ploidy");
 
     private static final class PloidyProfile {
@@ -162,17 +220,17 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         runCommandLine(argsBuilder);
     }
 
-//    @Test(groups = {"python"})
-//    public void testCohort() {
-//        final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-//        COUNT_FILES.forEach(argsBuilder::addInput);
-//        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
-//                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
-//                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
-//                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
-//                .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
-//        runCommandLine(argsBuilder);
-//    }
+    @Test(groups = {"python"})
+    public void testAneuploidyCohort() {
+        final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
+        COUNT_FILES.forEach(argsBuilder::addInput);
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors.tsv"))
+                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
+                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort")
+                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
+                .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
+        runCommandLine(argsBuilder);
+    }
 
     @Test(groups = {"python"}, expectedExceptions = UserException.BadInput.class)
     public void testCohortWithoutContigPloidyPriors() {

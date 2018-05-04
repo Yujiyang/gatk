@@ -35,7 +35,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             minValue = 0.,
             optional = true
     )
-    private double ploidyConcentrationScale = 0.1;
+    private double ploidyConcentrationScale = 0.01;
 
     @Argument(
             doc = "Upper bound of the uniform prior on the per-sample depth.",
