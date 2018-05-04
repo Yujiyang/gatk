@@ -392,12 +392,12 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_global(b_j)
         b_j_norm = Deterministic('b_j_norm', var=b_j / tt.mean(b_j))
 
-        f_sj = Bound(Normal,
-                     lower=mosaicism_bias_lower_bound,
-                     upper=mosaicism_bias_upper_bound)('f_sj',
-                                                       sd=mosaicism_bias_scale,
-                                                       shape=(num_samples, num_contigs))
-        register_as_sample_specific(f_sj, sample_axis=0)
+        # f_sj = Bound(Normal,
+        #              lower=mosaicism_bias_lower_bound,
+        #              upper=mosaicism_bias_upper_bound)('f_sj',
+        #                                                sd=mosaicism_bias_scale,
+        #                                                shape=(num_samples, num_contigs))
+        # register_as_sample_specific(f_sj, sample_axis=0)
 
         pi_sik = Dirichlet('pi_sik',
                            a=ploidy_concentration_scale * ploidy_state_priors_ik,
@@ -429,7 +429,7 @@ class PloidyModel(GeneralizedContinuousModel):
         # logp_sjkm = Poisson.dist(mu=mu_sjk.dimshuffle(0, 1, 2, 'x') + eps) \
         #     .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 'x', 0))
 
-        def _logp_hist_sijkm(_hist_sjm):
+        def _logp_hist_sjkm(_hist_sjm):
             # num_occurrences_tot_sj = tt.sum(_hist_sjm * mask_sjm, axis=2)
             # logp_hist_sjkm = Poisson.dist(mu=num_occurrences_tot_sj.dimshuffle(0, 1, 'x', 'x') * \
             #                              tt.exp(logp_sjkm) + eps) \
@@ -437,12 +437,14 @@ class PloidyModel(GeneralizedContinuousModel):
             # return mask_sjm[:, np.newaxis, :, np.newaxis, :] * \
             #        is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] * \
             #        (tt.log(pi_sik[:, :, np.newaxis, :, np.newaxis] + eps) + logp_hist_sjkm[:, np.newaxis, :, :, :])
-            return mask_sjm[:, np.newaxis, :, np.newaxis, :] * _hist_sjm[:, np.newaxis, :, np.newaxis, :] * \
-                   is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] * \
-                   (tt.log(pi_sik[:, :, np.newaxis, :, np.newaxis] + eps) + logp_sjkm[:, np.newaxis, :, :, :])
+            return tt.sum(
+                mask_sjm[:, np.newaxis, :, np.newaxis, :] * _hist_sjm[:, np.newaxis, :, np.newaxis, :] * \
+                is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] * \
+                (tt.log(pi_sik[:, :, np.newaxis, :, np.newaxis] + eps) + logp_sjkm[:, np.newaxis, :, :, :]),
+                axis=1)
 
         DensityDist(name='hist_sjm',
-                    logp=lambda _hist_sjm: tt.sum(pm.logsumexp(_logp_hist_sijkm(_hist_sjm), axis=-2), axis=1),
+                    logp=lambda _hist_sjm: pm.logsumexp(_logp_hist_sjkm(_hist_sjm), axis=-2),
                     observed=hist_sjm)
 
         # for ploidy log emission sampling
@@ -452,9 +454,9 @@ class PloidyModel(GeneralizedContinuousModel):
         #     is_ploidy_in_ploidy_state_jkl[np.newaxis, np.newaxis, :, :, :] +
         #      eps),
         #     axis=1), axis=-2))
-        logp_sjl = tt.sum(tt.sum(tt.sum(
-            _logp_hist_sijkm(hist_sjm)[:, :, :, :, np.newaxis, :] * (is_ploidy_in_ploidy_state_jkl[np.newaxis, np.newaxis, :, :, :, np.newaxis] + eps),
-            axis=1), axis=-3), axis=-1)
+        logp_sjl = tt.sum(tt.sum(
+            _logp_hist_sjkm(hist_sjm)[:, :, :, np.newaxis, :] * (is_ploidy_in_ploidy_state_jkl[np.newaxis, :, :, :, np.newaxis] + eps),
+            axis=-3), axis=-1)
         Deterministic(name='logp_sjl', var=logp_sjl)
 
 
