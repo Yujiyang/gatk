@@ -445,13 +445,6 @@ class PloidyModel(GeneralizedContinuousModel):
                     logp=lambda _hist_sjm: pm.logsumexp(_logp_hist_sjkm(_hist_sjm), axis=-2),
                     observed=hist_sjm)
 
-        # for ploidy log emission sampling
-        # logp_sjl = np.log(tt.sum(tt.sum(
-        #     (pi_sik[:, :, np.newaxis, :, np.newaxis] *
-        #     is_contig_in_contig_tuple_ij[np.newaxis, :, :, np.newaxis, np.newaxis] *
-        #     is_ploidy_in_ploidy_state_jkl[np.newaxis, np.newaxis, :, :, :] +
-        #      eps),
-        #     axis=1), axis=-2))
         logp_sjl = tt.sum(tt.sum(_logp_hist_sjkm(hist_sjm), axis=-1)[:, :, :, np.newaxis] *
                           (is_ploidy_in_ploidy_state_jkl[np.newaxis, :, :, :] + eps),
                           axis=-2)
