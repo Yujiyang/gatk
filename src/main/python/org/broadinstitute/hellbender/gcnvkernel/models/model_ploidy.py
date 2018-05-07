@@ -414,7 +414,7 @@ class PloidyModel(GeneralizedContinuousModel):
 
         pi_i_sk = []
         for i, contig_tuple in enumerate(contig_tuples):
-            if len(contig_tuple) > 1:
+            if len(ploidy_state_priors_i_k[i]) > 1:
                 pi_i_sk.append(Dirichlet('pi_%d_sk' % i,
                                          a=ploidy_concentration_scale * ploidy_state_priors_i_k[i],
                                          shape=(num_samples, len(ploidy_state_priors_i_k[i])),
