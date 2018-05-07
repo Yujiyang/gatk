@@ -184,8 +184,7 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
 
     @Argument(
             doc = "Input read-count files containing integer read counts in genomic intervals for all samples.  " +
-                    "Intervals must be identical and in the same order for all samples.  " +
-                    "If only a single sample is specified, an input ploidy-model directory must also be specified.  ",
+                    "Intervals must be identical and in the same order for all samples.",
             fullName = StandardArgumentDefinitions.INPUT_LONG_NAME,
             shortName = StandardArgumentDefinitions.INPUT_SHORT_NAME,
             minElements = 1
@@ -193,16 +192,16 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
     private List<File> inputReadCountFiles = new ArrayList<>();
 
     @Argument(
-            doc = "Input file specifying ploidy-state priors.  If only a single sample is specified, this input should not be provided.  " +
-                    "If multiple samples are specified, this input is required.",
+            doc = "Input file specifying ploidy-state priors.  This input is required in COHORT mode, " +
+                    "but should not be provided in CASE mode.",
             fullName = PLOIDY_STATE_PRIORS_FILE_LONG_NAME,
             optional = true
     )
     private File inputPloidyStatePriorsFile;
 
     @Argument(
-            doc = "Input ploidy-model directory.  If only a single sample is specified, this input is required.  " +
-                    "If multiple samples are specified, this input should not be provided.",
+            doc = "Input ploidy-model directory.  If this input is not provided, the tool will run in COHORT mode; " +
+                    "otherwise, the tool will run in CASE mode.",
             fullName = CopyNumberStandardArgument.MODEL_LONG_NAME,
             optional = true
     )
@@ -292,22 +291,18 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
 
         if (inputModelDir != null) {
             runMode = RunMode.CASE;
-            logger.info("A contig-ploidy model was provided, running in case mode...");
+            logger.info("A contig-ploidy model was provided, running in CASE mode...");
             Utils.validateArg(new File(inputModelDir).exists(),
                     String.format("Input ploidy-model directory %s does not exist.", inputModelDir));
             if (inputPloidyStatePriorsFile != null) {
-                throw new UserException.BadInput("Invalid combination of inputs: Running in case mode, " +
+                throw new UserException.BadInput("Invalid combination of inputs: Running in CASE mode, " +
                         "but contig-ploidy priors were provided.");
             }
         } else {
             runMode = RunMode.COHORT;
-            logger.info("No contig-ploidy model was provided, running in cohort mode...");
-            if (inputReadCountFiles.size() == 1) {
-                throw new UserException.BadInput("Invalid combination of inputs: Running in cohort mode, " +
-                        "but only a single sample was provided.");
-            }
-            if (inputPloidyStatePriorsFile == null){
-                throw new UserException.BadInput("Contig-ploidy priors must be provided in cohort mode.");
+            logger.info("No contig-ploidy model was provided, running in COHORT mode...");
+            if (inputPloidyStatePriorsFile == null) {
+                throw new UserException.BadInput("Contig-ploidy priors must be provided in COHORT mode.");
             }
             IOUtils.canReadFile(inputPloidyStatePriorsFile);
         }

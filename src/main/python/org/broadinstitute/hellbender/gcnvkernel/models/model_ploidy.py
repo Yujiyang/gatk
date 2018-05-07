@@ -431,15 +431,16 @@ class PloidyModel(GeneralizedContinuousModel):
                    tt.maximum(ploidy_j_k[j][np.newaxis, :], e_js[j].dimshuffle(0, 'x'))
                    for j in range(num_contigs)]
 
-        alpha_js = pm.Uniform('alpha_js',
-                              upper=10000.,
-                              shape=(num_contigs, num_samples))
-        register_as_sample_specific(alpha_js, sample_axis=1)
+        psi_js = Exponential(name='psi_js',
+                             lam=100.0, #1.0 / ploidy_config.psi_scale,
+                             shape=(num_contigs, num_samples))
+        register_as_sample_specific(psi_js, sample_axis=1)
+        alpha_js = tt.inv((tt.exp(psi_js) - 1.0))
 
         p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-                                                alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
-                          .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
-                   for j in range(num_contigs)]
+                                                    alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
+                              .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
+                       for j in range(num_contigs)]
 
         # logp_sjkm = Poisson.dist(mu=mu_sjk.dimshuffle(0, 1, 2, 'x') + eps) \
         #     .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 'x', 0))
