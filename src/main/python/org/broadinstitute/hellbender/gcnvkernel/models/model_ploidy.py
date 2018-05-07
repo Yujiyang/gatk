@@ -413,7 +413,7 @@ class PloidyModel(GeneralizedContinuousModel):
                              shape=(num_samples, len(ploidy_state_priors_i_k[i])),
                              transform=pm.distributions.transforms.t_stick_breaking(eps))
                    if len(contig_tuple) > 1 else Deterministic('pi_%d_sk' % i, var=tt.ones((num_samples, 1)))
-                   for i, contig_tuple in self.ploidy_workspace.contig_tuples]
+                   for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples)]
         for i in range(num_contig_tuples):
             register_as_sample_specific(pi_i_sk[i], sample_axis=0)
 
