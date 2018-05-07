@@ -401,21 +401,23 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_global(b_j)
         b_j_norm = Deterministic('b_j_norm', var=b_j / tt.mean(b_j))
 
-        # f_sj = Bound(Normal,
-        #              lower=mosaicism_bias_lower_bound,
-        #              upper=mosaicism_bias_upper_bound)('f_sj',
-        #                                                sd=mosaicism_bias_scale,
-        #                                                shape=(num_samples, num_contigs))
-        # register_as_sample_specific(f_sj, sample_axis=0)
+        f_js = Bound(Normal,
+                     lower=mosaicism_bias_lower_bound,
+                     upper=mosaicism_bias_upper_bound)('f_js',
+                                                       sd=mosaicism_bias_scale,
+                                                       shape=(num_contigs, num_samples))
+        register_as_sample_specific(f_js, sample_axis=1)
 
-        pi_i_sk = [Dirichlet('pi_%d_sk' % i,
-                             a=ploidy_concentration_scale * ploidy_state_priors_i_k[i],
-                             shape=(num_samples, len(ploidy_state_priors_i_k[i])),
-                             transform=pm.distributions.transforms.t_stick_breaking(eps))
-                   if len(contig_tuple) > 1 else Deterministic('pi_%d_sk' % i, var=tt.ones((num_samples, 1)))
-                   for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples)]
-        for i in range(num_contig_tuples):
-            register_as_sample_specific(pi_i_sk[i], sample_axis=0)
+        pi_i_sk = []
+        for i, contig_tuple in enumerate(contig_tuples):
+            if len(contig_tuple) > 1:
+                pi_i_sk.append(Dirichlet('pi_%d_sk' % i,
+                                         a=ploidy_concentration_scale * ploidy_state_priors_i_k[i],
+                                         shape=(num_samples, len(ploidy_state_priors_i_k[i])),
+                                         transform=pm.distributions.transforms.t_stick_breaking(eps)))
+                register_as_sample_specific(pi_i_sk[i], sample_axis=0)
+            else:
+                pi_i_sk.append(Deterministic('pi_%d_sk' % i, var=tt.ones((num_samples, 1))))
 
         e_js = Uniform('e_js',
                        lower=0.,
@@ -424,35 +426,35 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_sample_specific(e_js, sample_axis=1)
 
         mu_j_sk = [d_s.dimshuffle(0, 'x') * b_j_norm[j] * \
-                   tt.maximum(ploidy_j_k[j][np.newaxis, :], e_js[j].dimshuffle(0, 'x'))
+                   (tt.maximum(ploidy_j_k[j][np.newaxis, :] + f_js[j].dimshuffle(0, 'x') * (ploidy_j_k[j][np.newaxis, :] > 0),
+                               e_js[j].dimshuffle(0, 'x')))
+                   # tt.maximum(ploidy_j_k[j][np.newaxis, :], e_js[j].dimshuffle(0, 'x'))
                    for j in range(num_contigs)]
-                 # (tt.maximum(ploidy_jk[np.newaxis, :, :] + f_sj.dimshuffle(0, 1, 'x') * (ploidy_jk[np.newaxis, :, :] > 0),
-                 #               e_sj.dimshuffle(0, 1, 'x')))
 
-        psi_js = Exponential(name='psi_js',
-                             lam=100.0, #1.0 / ploidy_config.psi_scale,
-                             shape=(num_contigs, num_samples))
-        register_as_sample_specific(psi_js, sample_axis=1)
-        alpha_js = tt.inv((tt.exp(psi_js) - 1.0))
+        alpha_js = pm.Uniform('alpha_js',
+                              upper=10000.,
+                              shape=(num_contigs, num_samples))
+        register_as_sample_specific(alpha_js, sample_axis=1)
 
-        logp_j_skm = [NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-                                            alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
-                          .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
-                      for j in range(num_contigs)]
+        p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+                                                alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
+                          .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
+                   for j in range(num_contigs)]
 
         # logp_sjkm = Poisson.dist(mu=mu_sjk.dimshuffle(0, 1, 2, 'x') + eps) \
         #     .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 'x', 0))
 
         def _logp_hist_j_skm(_hist_sjm):
-            # num_occurrences_tot_sj = tt.sum(_hist_sjm * mask_sjm, axis=2)
-            # logp_hist_sjkm = Poisson.dist(mu=num_occurrences_tot_sj.dimshuffle(0, 1, 'x', 'x') * \
-            #                              tt.exp(logp_sjkm) + eps) \
-            #     .logp(_hist_sjm.dimshuffle(0, 1, 'x', 2))
-            # return mask_sjm[:, :, np.newaxis, :] * \
-            #        (tt.log(pi_sjk[:, :, :, np.newaxis] + eps) + logp_hist_sjkm)
-            return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-                    (tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]])
+            num_occurrences_tot_sj = tt.sum(_hist_sjm * mask_sjm, axis=2)
+            logp_hist_j_skm = [pm.Poisson.dist(mu=num_occurrences_tot_sj[:, j].dimshuffle(0, 'x', 'x') * p_j_skm[j] + eps) \
+                                   .logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
+                               for j in range(num_contigs)]
+            return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+                   (tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]])
                     for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
+            # return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+            #         (tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]])
+            #         for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
 
         DensityDist(name='hist_sjm',
                     logp=lambda _hist_sjm: tt.sum([pm.logsumexp(logp_hist_skm, axis=1)

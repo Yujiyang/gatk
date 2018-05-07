@@ -33,7 +33,7 @@ class PloidyModelWriter:
         self.ploidy_model_approx = ploidy_model_approx
         self.output_path = output_path
         (self._approx_var_set, self._approx_mu_map,
-         self._approx_std_map) = io_commons.extract_meanfield_posterior_parameters(self.ploidy_model_approx)
+         self._approx_std_map) = io_commons.extract_mean_field_posterior_parameters(self.ploidy_model_approx)
 
     def __call__(self):
         # write gcnvkernel version
@@ -81,7 +81,7 @@ class SamplePloidyWriter:
         self.ploidy_model_approx = ploidy_model_approx
         self.output_path = output_path
         (self._approx_var_set, self._approx_mu_map,
-         self._approx_std_map) = io_commons.extract_meanfield_posterior_parameters(self.ploidy_model_approx)
+         self._approx_std_map) = io_commons.extract_mean_field_posterior_parameters(self.ploidy_model_approx)
 
     @staticmethod
     def _write_sample_contig_ploidy(sample_posterior_path: str,
@@ -156,7 +156,7 @@ class SamplePloidyWriter:
             io_commons.write_sample_name_to_txt_file(sample_posterior_path, sample_name)
 
             # write sample-specific posteriors in the approximation
-            io_commons.write_meanfield_sample_specific_params(
+            io_commons.write_mean_field_sample_specific_params(
                 si, sample_posterior_path, self._approx_var_set, self._approx_mu_map, self._approx_std_map,
                 self.ploidy_model, sample_name_comment_line)
 
@@ -181,7 +181,7 @@ class PloidyModelReader:
         io_commons.check_gcnvkernel_version_from_path(self.input_path)
 
         # read model params
-        io_commons.read_meanfield_global_params(self.input_path, self.ploidy_model_approx, self.ploidy_model)
+        io_commons.read_mean_field_global_params(self.input_path, self.ploidy_model_approx, self.ploidy_model)
 
 
 def get_ploidy_state_priors_map_from_tsv_file(input_path: str,
