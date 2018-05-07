@@ -450,7 +450,7 @@ class PloidyModel(GeneralizedContinuousModel):
                                    .logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
                                for j in range(num_contigs)]
             return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-                   (tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]])
+                   (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]])
                     for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
             # return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
             #         (tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]])
