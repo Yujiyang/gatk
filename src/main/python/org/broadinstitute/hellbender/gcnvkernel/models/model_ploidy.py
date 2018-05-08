@@ -503,7 +503,7 @@ class PloidyEmissionBasicSampler:
         return self._simultaneous_log_ploidy_emission_sampler is not None
 
     def draw(self) -> np.ndarray:
-        out, sampler = self._simultaneous_log_ploidy_emission_sampler()
+        out = self._simultaneous_log_ploidy_emission_sampler()
         log_ploidy_emission_sjl = out[0]
         d_s = out[1]
         psi_js = out[2]
@@ -513,7 +513,7 @@ class PloidyEmissionBasicSampler:
         print(1. / (np.exp(psi_js) - 1))
         print(np.exp(log_ploidy_emission_sjl))
         print(pm.logsumexp(log_ploidy_emission_sjl, axis=2).eval()[:, :, 0])
-        return sampler
+        return log_ploidy_emission_sjl
         # return self._simultaneous_log_ploidy_emission_sampler()
 
     @th.configparser.change_flags(compute_test_value="off")
@@ -529,7 +529,7 @@ class PloidyEmissionBasicSampler:
             approx, self.ploidy_model['d_s'], size=self.samples_per_round)
         psi_js = commons.stochastic_node_mean_symbolic(
             approx, self.ploidy_model['psi_js'], size=self.samples_per_round)
-        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk), th.function(inputs=[], outputs=log_ploidy_emission_sjl)
+        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk)
 
 
 class PloidyBasicCaller:
