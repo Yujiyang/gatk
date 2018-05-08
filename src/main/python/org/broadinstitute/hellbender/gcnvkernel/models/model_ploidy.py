@@ -19,6 +19,7 @@ from ..tasks.inference_task_base import HybridInferenceParameters
 import matplotlib.pyplot as plt
 
 _logger = logging.getLogger(__name__)
+np.set_printoptions(threshold=np.inf)
 
 
 class PloidyModelConfig:
@@ -460,7 +461,7 @@ class PloidyModel(GeneralizedContinuousModel):
                    (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]])
                     for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
             # return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-            #         (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + tt.log(p_j_skm[contig_to_index_map[contig]]))
+            #         (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + tt.log(p_j_skm[contig_to_index_map[contig]] + eps))
             #         for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
 
         DensityDist(name='hist_sjm',
@@ -468,10 +469,13 @@ class PloidyModel(GeneralizedContinuousModel):
                                                    for logp_hist_skm in _logp_hist_j_skm(_hist_sjm)]),
                     observed=hist_sjm)
 
-        logp_hist_j_sk = [tt.sum(logp_hist_skm, axis=-1)
-                          for logp_hist_skm in _logp_hist_j_skm(hist_sjm)]
-        logp_jsl = tt.as_tensor_variable([tt.sum(logp_hist_j_sk[j][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[j][np.newaxis, :, :], axis=-2)
-                                          for j in range(num_contigs)])
+        # logp_hist_j_sk = [tt.sum(logp_hist_skm, axis=-1)
+        #                   for logp_hist_skm in _logp_hist_j_skm(hist_sjm)]
+        # logp_jsl = tt.as_tensor_variable([tt.sum(logp_hist_j_sk[j][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[j][np.newaxis, :, :], axis=1)
+        #                                   for j in range(num_contigs)])
+
+        logp_jsl = tt.as_tensor_variable([tt.log(pi_i_sk[i] + eps) * is_contig_in_contig_tuple_ij[i, j]
+                          for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
         Deterministic(name='logp_sjl', var=logp_jsl.dimshuffle(1, 0, 2))
 
 
@@ -537,7 +541,8 @@ class PloidyBasicCaller:
 
     @th.configparser.change_flags(compute_test_value="off")
     def _update_log_q_ploidy_sjl_theano_func(self) -> th.compile.function_module.Function:
-        new_log_q_ploidy_sjl = self.ploidy_workspace.log_p_ploidy_jl.dimshuffle('x', 0, 1) + self.ploidy_workspace.log_ploidy_emission_sjl
+        # new_log_q_ploidy_sjl = self.ploidy_workspace.log_p_ploidy_jl.dimshuffle('x', 0, 1) + self.ploidy_workspace.log_ploidy_emission_sjl
+        new_log_q_ploidy_sjl = self.ploidy_workspace.log_ploidy_emission_sjl
         new_log_q_ploidy_sjl -= pm.logsumexp(new_log_q_ploidy_sjl, axis=2)
         old_log_q_ploidy_sjl = self.ploidy_workspace.log_q_ploidy_sjl
         admixed_new_log_q_ploidy_sjl = commons.safe_logaddexp(

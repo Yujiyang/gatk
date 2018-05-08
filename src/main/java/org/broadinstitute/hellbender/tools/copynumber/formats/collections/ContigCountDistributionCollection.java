@@ -12,6 +12,7 @@ import org.broadinstitute.hellbender.utils.tsv.DataLine;
 import org.broadinstitute.hellbender.utils.tsv.TableColumnCollection;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiConsumer;
@@ -80,6 +81,7 @@ public final class ContigCountDistributionCollection extends AbstractRecordColle
         final Map<String, Map<Integer, Integer>> mapOfMaps = readCounts.getRecords().stream()
                 .collect(Collectors.groupingBy(
                         SimpleCount::getContig,
+                        LinkedHashMap::new,
                         Collectors.groupingBy(
                                 SimpleCount::getCount,
                                 Collectors.summingInt(c -> 1))));
