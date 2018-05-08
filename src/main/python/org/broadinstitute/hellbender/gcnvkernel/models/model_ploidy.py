@@ -286,25 +286,27 @@ class PloidyWorkspace:
         # print(self.ploidy_state_priors_ik)
         # print('ploidy_priors_jl')
         # print(self.ploidy_priors_jl)
-        print('counts_m')
-        print(self.counts_m)
-        print('hist_sjm')
-        print(hist_sjm[:, :, self.counts_m])
+        # print('counts_m')
+        # print(self.counts_m)
+        # print('hist_sjm')
+        # print(hist_sjm[:, :, self.counts_m])
 
-        # ploidy log priors
-        self.log_p_ploidy_jl: types.TensorSharedVariable = \
-            th.shared(np.log(self.ploidy_priors_jl),
-                      name='log_p_ploidy_sjl', borrow=config.borrow_numpy)
+        # ploidy-state log priors
+        self.log_p_ploidy_state_i_k: List[types.TensorSharedVariable] = \
+            [th.shared(np.log(self.ploidy_state_priors_i_k[i]), name='log_p_ploidy_%d_k' % i, borrow=config.borrow_numpy)
+             for i in range(self.num_contig_tuples)]
 
-        # ploidy log posteriors (initialize to priors)
-        self.log_q_ploidy_sjl: types.TensorSharedVariable = \
-            th.shared(np.tile(np.log(self.ploidy_priors_jl), (self.num_samples, 1, 1)),
-                      name='log_q_ploidy_sjl', borrow=config.borrow_numpy)
+        # ploidy-state log posteriors (initialize to priors)
+        self.log_q_log_p_ploidy_state_i_sk: List[types.TensorSharedVariable] = \
+            [th.shared(np.tile(np.log(self.ploidy_state_priors_i_k[i]), (self.num_samples, 1)),
+                       name='log_q_ploidy_%d_sk' % i, borrow=config.borrow_numpy)
+             for i in range(self.num_contig_tuples)]
 
-        # ploidy log emission (initial value is immaterial)
-        self.log_ploidy_emission_sjl: types.TensorSharedVariable = \
-            th.shared(np.zeros((self.num_samples, self.num_contigs, self.num_ploidies), dtype=types.floatX),
-                      name='log_ploidy_emission_sjl', borrow=config.borrow_numpy)
+        # ploidy-state log emission (initial value is immaterial)
+        self.log_ploidy_state_emission_i_sk: List[types.TensorSharedVariable] = \
+            [th.shared(np.zeros((self.num_samples, len(self.ploidy_states_i_k[i])), dtype=types.floatX),
+                       name='log_ploidy_state_emission_%d_sk' % i, borrow=config.borrow_numpy)
+             for i in range(self.num_contig_tuples)]
 
     @staticmethod
     def _get_contig_set_from_interval_list(interval_list: List[Interval]) -> Set[str]:
@@ -424,6 +426,7 @@ class PloidyModel(GeneralizedContinuousModel):
                 register_as_sample_specific(pi_i_sk[i], sample_axis=0)
             else:
                 pi_i_sk.append(Deterministic('pi_%d_sk' % i, var=tt.ones((num_samples, 1))))
+            Deterministic(name='logp_%d_sk' % i, var=tt.log(pi_i_sk[i] + eps))
 
         e_js = Uniform('e_js',
                        lower=0.,
@@ -469,22 +472,13 @@ class PloidyModel(GeneralizedContinuousModel):
                                                    for logp_hist_skm in _logp_hist_j_skm(_hist_sjm)]),
                     observed=hist_sjm)
 
-        # logp_hist_j_sk = [tt.sum(logp_hist_skm, axis=-1)
-        #                   for logp_hist_skm in _logp_hist_j_skm(hist_sjm)]
-        # logp_jsl = tt.as_tensor_variable([tt.sum(logp_hist_j_sk[j][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[j][np.newaxis, :, :], axis=1)
-        #                                   for j in range(num_contigs)])
-
-        pi_j_sk = [pi_i_sk[i] for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
-        logp_jsl = tt.as_tensor_variable([tt.log(tt.sum(pi_j_sk[j][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[j][np.newaxis, :, :], axis=1))
-                                          for j in range(num_contigs)])
-        Deterministic(name='logp_sjl', var=logp_jsl.dimshuffle(1, 0, 2))
-
 
 class PloidyEmissionBasicSampler:
     """Draws posterior samples from the ploidy log emission probability for a given variational
     approximation to the ploidy model posterior."""
     def __init__(self, ploidy_model: PloidyModel, samples_per_round: int):
         self.ploidy_model = ploidy_model
+        self.ploidy_workspace = ploidy_model.ploidy_workspace
         self.samples_per_round = samples_per_round
         self._simultaneous_log_ploidy_emission_sampler = None
 
@@ -503,34 +497,39 @@ class PloidyEmissionBasicSampler:
         return self._simultaneous_log_ploidy_emission_sampler is not None
 
     def draw(self) -> np.ndarray:
-        # out = self._simultaneous_log_ploidy_emission_sampler()
-        # log_ploidy_emission_sjl = out[0]
-        # d_s = out[1]
-        # psi_js = out[2]
-        # pi_i_sk = out[3:]
-        # print(pi_i_sk)
-        # print(d_s)
-        # print(1. / (np.exp(psi_js) - 1))
-        # print(np.exp(log_ploidy_emission_sjl))
-        # print(pm.logsumexp(log_ploidy_emission_sjl, axis=2).eval()[:, :, 0])
-        # return log_ploidy_emission_sjl
-        return self._simultaneous_log_ploidy_emission_sampler()
+        out = self._simultaneous_log_ploidy_emission_sampler()
+        log_ploidy_emission_sjl = out[0]
+        d_s = out[1]
+        psi_js = out[2]
+        pi_i_sk = out[3:]
+        print(pi_i_sk)
+        print(d_s)
+        print(1. / (np.exp(psi_js) - 1))
+        print(np.exp(log_ploidy_emission_sjl))
+        print(pm.logsumexp(log_ploidy_emission_sjl, axis=2).eval()[:, :, 0])
+        return log_ploidy_emission_sjl
+        # return self._simultaneous_log_ploidy_emission_sampler()
 
     @th.configparser.change_flags(compute_test_value="off")
     def _get_compiled_simultaneous_log_ploidy_emission_sampler(self, approx: pm.approximations.MeanField):
         """For a given variational approximation, returns a compiled theano function that draws posterior samples
         from the log ploidy emission."""
-        log_ploidy_emission_sjl = commons.stochastic_node_mean_symbolic(
-            approx, self.ploidy_model['logp_sjl'], size=self.samples_per_round)
-        # pi_i_sk = [commons.stochastic_node_mean_symbolic(
-        #     approx, self.ploidy_model['pi_%d_sk' % i], size=self.samples_per_round)
-        #     for i in range(self.ploidy_model.ploidy_workspace.num_contig_tuples)]
-        # d_s = commons.stochastic_node_mean_symbolic(
-        #     approx, self.ploidy_model['d_s'], size=self.samples_per_round)
-        # psi_js = commons.stochastic_node_mean_symbolic(
-        #     approx, self.ploidy_model['psi_js'], size=self.samples_per_round)
-        # return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk)
-        return th.function(inputs=[], outputs=log_ploidy_emission_sjl)
+        log_ploidy_emission_i_sk = [commons.stochastic_node_mean_symbolic(
+            approx, self.ploidy_model['logp_%d_sk' % i], size=self.samples_per_round)
+            for i in range(self.ploidy_workspace.num_contig_tuples)]
+        log_ploidy_emission_sjl = tt.stack([
+            tt.dot(tt.exp(log_ploidy_emission_i_sk[i]), self.ploidy_workspace.is_ploidy_in_ploidy_state_j_kl[j])
+            for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples)
+            for j, contig in enumerate(contig_tuple)]).dimshuffle(1, 0, 2)
+        pi_i_sk = [commons.stochastic_node_mean_symbolic(
+            approx, self.ploidy_model['pi_%d_sk' % i], size=self.samples_per_round)
+            for i in range(self.ploidy_model.ploidy_workspace.num_contig_tuples)]
+        d_s = commons.stochastic_node_mean_symbolic(
+            approx, self.ploidy_model['d_s'], size=self.samples_per_round)
+        psi_js = commons.stochastic_node_mean_symbolic(
+            approx, self.ploidy_model['psi_js'], size=self.samples_per_round)
+        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk)
+        # return th.function(inputs=[], outputs=log_ploidy_emission_sjl)
 
 
 class PloidyBasicCaller:
