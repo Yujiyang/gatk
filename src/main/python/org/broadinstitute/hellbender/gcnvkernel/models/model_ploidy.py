@@ -503,18 +503,18 @@ class PloidyEmissionBasicSampler:
         return self._simultaneous_log_ploidy_emission_sampler is not None
 
     def draw(self) -> np.ndarray:
-        out = self._simultaneous_log_ploidy_emission_sampler()
-        log_ploidy_emission_sjl = out[0]
-        d_s = out[1]
-        psi_js = out[2]
-        pi_i_sk = out[3:]
-        print(pi_i_sk)
-        print(d_s)
-        print(1. / (np.exp(psi_js) - 1))
-        print(np.exp(log_ploidy_emission_sjl))
-        print(pm.logsumexp(log_ploidy_emission_sjl, axis=2).eval()[:, :, 0])
-        return log_ploidy_emission_sjl
-        # return self._simultaneous_log_ploidy_emission_sampler()
+        # out = self._simultaneous_log_ploidy_emission_sampler()
+        # log_ploidy_emission_sjl = out[0]
+        # d_s = out[1]
+        # psi_js = out[2]
+        # pi_i_sk = out[3:]
+        # print(pi_i_sk)
+        # print(d_s)
+        # print(1. / (np.exp(psi_js) - 1))
+        # print(np.exp(log_ploidy_emission_sjl))
+        # print(pm.logsumexp(log_ploidy_emission_sjl, axis=2).eval()[:, :, 0])
+        # return log_ploidy_emission_sjl
+        return self._simultaneous_log_ploidy_emission_sampler()
 
     @th.configparser.change_flags(compute_test_value="off")
     def _get_compiled_simultaneous_log_ploidy_emission_sampler(self, approx: pm.approximations.MeanField):
@@ -522,14 +522,15 @@ class PloidyEmissionBasicSampler:
         from the log ploidy emission."""
         log_ploidy_emission_sjl = commons.stochastic_node_mean_symbolic(
             approx, self.ploidy_model['logp_sjl'], size=self.samples_per_round)
-        pi_i_sk = [commons.stochastic_node_mean_symbolic(
-            approx, self.ploidy_model['pi_%d_sk' % i], size=self.samples_per_round)
-            for i in range(self.ploidy_model.ploidy_workspace.num_contig_tuples)]
-        d_s = commons.stochastic_node_mean_symbolic(
-            approx, self.ploidy_model['d_s'], size=self.samples_per_round)
-        psi_js = commons.stochastic_node_mean_symbolic(
-            approx, self.ploidy_model['psi_js'], size=self.samples_per_round)
-        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk)
+        # pi_i_sk = [commons.stochastic_node_mean_symbolic(
+        #     approx, self.ploidy_model['pi_%d_sk' % i], size=self.samples_per_round)
+        #     for i in range(self.ploidy_model.ploidy_workspace.num_contig_tuples)]
+        # d_s = commons.stochastic_node_mean_symbolic(
+        #     approx, self.ploidy_model['d_s'], size=self.samples_per_round)
+        # psi_js = commons.stochastic_node_mean_symbolic(
+        #     approx, self.ploidy_model['psi_js'], size=self.samples_per_round)
+        # return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk)
+        return th.function(inputs=[], outputs=log_ploidy_emission_sjl)
 
 
 class PloidyBasicCaller:
