@@ -474,8 +474,9 @@ class PloidyModel(GeneralizedContinuousModel):
         # logp_jsl = tt.as_tensor_variable([tt.sum(logp_hist_j_sk[j][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[j][np.newaxis, :, :], axis=1)
         #                                   for j in range(num_contigs)])
 
-        logp_jsl = tt.as_tensor_variable([tt.log(pi_i_sk[i] + eps) * is_contig_in_contig_tuple_ij[i, j]
-                          for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
+        pi_j_sk = [pi_i_sk[i] for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
+        logp_jsl = tt.as_tensor_variable([tt.log(tt.sum(pi_j_sk[j][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[j][np.newaxis, :, :], axis=1))
+                                          for j in range(num_contigs)])
         Deterministic(name='logp_sjl', var=logp_jsl.dimshuffle(1, 0, 2))
 
 
@@ -502,7 +503,7 @@ class PloidyEmissionBasicSampler:
         return self._simultaneous_log_ploidy_emission_sampler is not None
 
     def draw(self) -> np.ndarray:
-        out = self._simultaneous_log_ploidy_emission_sampler()
+        out, sampler = self._simultaneous_log_ploidy_emission_sampler()
         log_ploidy_emission_sjl = out[0]
         d_s = out[1]
         psi_js = out[2]
@@ -511,7 +512,8 @@ class PloidyEmissionBasicSampler:
         print(d_s)
         print(1. / (np.exp(psi_js) - 1))
         print(np.exp(log_ploidy_emission_sjl))
-        return log_ploidy_emission_sjl
+        print(pm.logsumexp(log_ploidy_emission_sjl, axis=2).eval()[:, :, 0])
+        return sampler
         # return self._simultaneous_log_ploidy_emission_sampler()
 
     @th.configparser.change_flags(compute_test_value="off")
@@ -527,7 +529,7 @@ class PloidyEmissionBasicSampler:
             approx, self.ploidy_model['d_s'], size=self.samples_per_round)
         psi_js = commons.stochastic_node_mean_symbolic(
             approx, self.ploidy_model['psi_js'], size=self.samples_per_round)
-        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk)
+        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk), th.function(inputs=[], outputs=[log_ploidy_emission_sjl])
 
 
 class PloidyBasicCaller:
@@ -542,8 +544,8 @@ class PloidyBasicCaller:
     @th.configparser.change_flags(compute_test_value="off")
     def _update_log_q_ploidy_sjl_theano_func(self) -> th.compile.function_module.Function:
         # new_log_q_ploidy_sjl = self.ploidy_workspace.log_p_ploidy_jl.dimshuffle('x', 0, 1) + self.ploidy_workspace.log_ploidy_emission_sjl
-        new_log_q_ploidy_sjl = self.ploidy_workspace.log_ploidy_emission_sjl
-        new_log_q_ploidy_sjl -= pm.logsumexp(new_log_q_ploidy_sjl, axis=2)
+        # new_log_q_ploidy_sjl -= pm.logsumexp(new_log_q_ploidy_sjl, axis=2)
+        new_log_q_ploidy_sjl = self.ploidy_workspace.log_ploidy_emission_sjl - pm.logsumexp(self.ploidy_workspace.log_ploidy_emission_sjl, axis=2)
         old_log_q_ploidy_sjl = self.ploidy_workspace.log_q_ploidy_sjl
         admixed_new_log_q_ploidy_sjl = commons.safe_logaddexp(
             new_log_q_ploidy_sjl + np.log(self.inference_params.caller_external_admixing_rate),
