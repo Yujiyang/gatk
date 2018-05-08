@@ -529,7 +529,7 @@ class PloidyEmissionBasicSampler:
             approx, self.ploidy_model['d_s'], size=self.samples_per_round)
         psi_js = commons.stochastic_node_mean_symbolic(
             approx, self.ploidy_model['psi_js'], size=self.samples_per_round)
-        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk), th.function(inputs=[], outputs=[log_ploidy_emission_sjl])
+        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk), th.function(inputs=[], outputs=log_ploidy_emission_sjl)
 
 
 class PloidyBasicCaller:
