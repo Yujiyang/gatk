@@ -503,16 +503,16 @@ class PloidyEmissionBasicSampler:
         d_s = out[1]
         psi_js = out[2]
         pi_i_sk = out[3:]
-        print(pi_i_sk)
         print("pi_i_sk")
-        print(d_s)
+        print(pi_i_sk)
         print("d_s")
-        print(1. / (np.exp(psi_js) - 1))
+        print(d_s)
         print("1. / (np.exp(psi_js) - 1)")
-        print(np.exp(log_ploidy_emission_sjl))
+        print(1. / (np.exp(psi_js) - 1))
         print("np.exp(log_ploidy_emission_sjl)")
-        print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl))
+        print(np.exp(log_ploidy_emission_sjl.eval()))
         print("np.exp(self.ploidy_workspace.log_q_ploidy_sjl)")
+        print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl.eval()))
         return log_ploidy_emission_sjl
         # return self._simultaneous_log_ploidy_emission_sampler()
 
