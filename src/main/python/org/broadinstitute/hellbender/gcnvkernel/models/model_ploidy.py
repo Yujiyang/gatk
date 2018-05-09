@@ -510,7 +510,7 @@ class PloidyEmissionBasicSampler:
         print("1. / (np.exp(psi_js) - 1)")
         print(1. / (np.exp(psi_js) - 1))
         print("np.exp(log_ploidy_emission_sjl)")
-        print(np.exp(log_ploidy_emission_sjl.eval()))
+        print(np.exp(log_ploidy_emission_sjl))
         print("np.exp(self.ploidy_workspace.log_q_ploidy_sjl)")
         print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl.eval()))
         return log_ploidy_emission_sjl
