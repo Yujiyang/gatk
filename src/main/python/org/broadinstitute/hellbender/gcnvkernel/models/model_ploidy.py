@@ -254,6 +254,8 @@ class PloidyWorkspace:
         average_ploidy = 2. # TODO
         self.d_s_testval = np.median(np.sum(hist_sjm * np.arange(hist_sjm.shape[2]), axis=-1) / np.sum(hist_sjm, axis=-1), axis=-1) / average_ploidy
 
+        self.num_occurrences_tot_sj = np.sum(hist_sjm, axis=2)
+
         self.hist_sjm : types.TensorSharedVariable = \
             th.shared(hist_sjm[:, :, self.counts_m], name='hist_sjm', borrow=config.borrow_numpy)
 
@@ -443,27 +445,27 @@ class PloidyModel(GeneralizedContinuousModel):
                              lam=10.0, #1.0 / ploidy_config.psi_scale,
                              shape=(num_contigs, num_samples))
         register_as_sample_specific(psi_js, sample_axis=1)
-        alpha_js = tt.inv((tt.exp(psi_js) - 1.0))
+        alpha_js = tt.inv((tt.exp(psi_js) - 1.0 + eps))
 
         p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
                                                 alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
                           .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
                    for j in range(num_contigs)]
 
-        # p_j_skm = [tt.exp(Poisson.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps)
-        #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
-        #            for j in range(num_contigs)]
+        # logp_j_skm = [NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+        #                                     alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
+        #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
+        #               for j in range(num_contigs)]
 
         def _logp_hist_j_skm(_hist_sjm):
-            num_occurrences_tot_sj = tt.sum(_hist_sjm * mask_sjm, axis=2)
-            logp_hist_j_skm = [pm.Poisson.dist(mu=num_occurrences_tot_sj[:, j].dimshuffle(0, 'x', 'x') * p_j_skm[j] + eps) \
+            logp_hist_j_skm = [pm.Poisson.dist(mu=self.ploidy_workspace.num_occurrences_tot_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps) \
                                    .logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
                                for j in range(num_contigs)]
             return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
                    (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]])
                     for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
             # return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-            #         (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + tt.log(p_j_skm[contig_to_index_map[contig]] + eps))
+            #         (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]])
             #         for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
 
         DensityDist(name='hist_sjm',
@@ -502,10 +504,15 @@ class PloidyEmissionBasicSampler:
         psi_js = out[2]
         pi_i_sk = out[3:]
         print(pi_i_sk)
+        print("pi_i_sk")
         print(d_s)
+        print("d_s")
         print(1. / (np.exp(psi_js) - 1))
+        print("1. / (np.exp(psi_js) - 1)")
         print(np.exp(log_ploidy_emission_sjl))
-        print(pm.logsumexp(log_ploidy_emission_sjl, axis=2).eval()[:, :, 0])
+        print("np.exp(log_ploidy_emission_sjl)")
+        print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl))
+        print("np.exp(self.ploidy_workspace.log_q_ploidy_sjl)")
         return log_ploidy_emission_sjl
         # return self._simultaneous_log_ploidy_emission_sampler()
 
