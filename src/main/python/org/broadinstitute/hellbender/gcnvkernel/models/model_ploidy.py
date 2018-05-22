@@ -442,7 +442,7 @@ class PloidyModel(GeneralizedContinuousModel):
                    for j in range(num_contigs)]
 
         psi_js = Exponential(name='psi_js',
-                             lam=10.0, #1.0 / ploidy_config.psi_scale,
+                             lam=1000.0, #1.0 / ploidy_config.psi_scale,
                              shape=(num_contigs, num_samples))
         register_as_sample_specific(psi_js, sample_axis=1)
         alpha_js = tt.inv((tt.exp(psi_js) - 1.0 + eps))
@@ -502,13 +502,16 @@ class PloidyEmissionBasicSampler:
         log_ploidy_emission_sjl = out[0]
         d_s = out[1]
         psi_js = out[2]
-        pi_i_sk = out[3:]
+        b_j_norm = out[3]
+        pi_i_sk = out[4:]
         print("pi_i_sk")
         print(pi_i_sk)
         print("d_s")
         print(d_s)
         print("1. / (np.exp(psi_js) - 1)")
         print(1. / (np.exp(psi_js) - 1))
+        print("b_j_norm")
+        print(b_j_norm)
         print("np.exp(log_ploidy_emission_sjl)")
         print(np.exp(log_ploidy_emission_sjl))
         print("np.exp(self.ploidy_workspace.log_q_ploidy_sjl)")
@@ -531,7 +534,9 @@ class PloidyEmissionBasicSampler:
             approx, self.ploidy_model['d_s'], size=self.samples_per_round)
         psi_js = commons.stochastic_node_mean_symbolic(
             approx, self.ploidy_model['psi_js'], size=self.samples_per_round)
-        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js] + pi_i_sk)
+        b_j_norm = commons.stochastic_node_mean_symbolic(
+            approx, self.ploidy_model['b_j_norm'], size=self.samples_per_round)
+        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js, b_j_norm] + pi_i_sk)
         # return th.function(inputs=[], outputs=log_ploidy_emission_sjl)
 
 

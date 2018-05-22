@@ -263,7 +263,7 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         final File intervalsFile = IOUtils.createTempFile("intervals", ".tsv");
         final LocatableMetadata metadata = new SimpleLocatableMetadata(sequenceDictionary);
         new SimpleIntervalCollection(metadata, intervals).write(intervalsFile);
-        final File contigCountDistributionCollectionsDir = IOUtils.tempDir("contig-count-distribution-collections", "");
+        final File contigCountDistributionCollectionsDir = IOUtils.createTempDir("contig-count-distribution-collections");
         final List<File> contigCountDistributionCollectionFiles =
                 writeContigCountDistributionCollections(contigCountDistributionCollectionsDir, metadata, intervals);
 
