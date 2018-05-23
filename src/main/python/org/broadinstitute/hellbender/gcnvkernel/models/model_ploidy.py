@@ -210,13 +210,10 @@ class PloidyWorkspace:
         self.contig_to_index_map = {contig: index for index, contig in enumerate(self.contigs)}
 
         self.num_ploidy_states_j = np.array([len(ploidy_k) for ploidy_k in self.ploidy_j_k])
-        self.max_num_ploidy_states = np.max(self.num_ploidy_states_j)
         self.num_ploidies = np.max([np.max(ploidy_k) for ploidy_k in self.ploidy_j_k]) + 1
 
         self.is_ploidy_in_ploidy_state_j_kl = [np.zeros((self.num_ploidy_states_j[j], self.num_ploidies))
                                                for j in range(self.num_contigs)]
-        self.ploidy_state_priors_ik = 1E-10 * np.ones((self.num_contig_tuples, self.max_num_ploidy_states),
-                                                      dtype=types.floatX)
         self.ploidy_priors_jl = 1E-10 * np.ones((self.num_contigs, self.num_ploidies),
                                                 dtype=types.floatX)
 
@@ -226,11 +223,9 @@ class PloidyWorkspace:
                 self.is_ploidy_in_ploidy_state_j_kl[j][k, ploidy] = 1
 
         for i, contig_tuple in enumerate(self.contig_tuples):
-            unpadded_priors = np.array(list(self.ploidy_config.ploidy_state_priors_map[contig_tuple].values()))
-            self.ploidy_state_priors_ik[i, :len(unpadded_priors)] = unpadded_priors
             for contig in contig_tuple:
                 j = self.contig_to_index_map[contig]
-                self.ploidy_priors_jl[j] = np.sum(self.ploidy_state_priors_ik[i, :, np.newaxis] * self.is_ploidy_in_ploidy_state_j_kl[j], axis=0)
+                self.ploidy_priors_jl[j] = np.dot(self.ploidy_state_priors_i_k[i], self.is_ploidy_in_ploidy_state_j_kl[j])
 
         # count-distribution data
         hist_sjm = np.zeros((self.num_samples, self.num_contigs, self.num_counts), dtype=types.med_uint)
