@@ -213,14 +213,8 @@ class PloidyWorkspace:
         self.max_num_ploidy_states = np.max(self.num_ploidy_states_j)
         self.num_ploidies = np.max([np.max(ploidy_k) for ploidy_k in self.ploidy_j_k]) + 1
 
-        self.is_contig_in_contig_tuple_ij = np.zeros((self.num_contig_tuples, self.num_contigs),
-                                                     dtype=types.small_uint)
-        self.is_ploidy_in_ploidy_state_jkl = np.zeros((self.num_contigs, self.max_num_ploidy_states, self.num_ploidies),
-                                                      dtype=types.small_uint)
         self.is_ploidy_in_ploidy_state_j_kl = [np.zeros((self.num_ploidy_states_j[j], self.num_ploidies))
                                                for j in range(self.num_contigs)]
-        self.ploidy_jk = np.zeros((self.num_contigs, self.max_num_ploidy_states),
-                                  dtype=types.small_uint)
         self.ploidy_state_priors_ik = 1E-10 * np.ones((self.num_contig_tuples, self.max_num_ploidy_states),
                                                       dtype=types.floatX)
         self.ploidy_priors_jl = 1E-10 * np.ones((self.num_contigs, self.num_ploidies),
@@ -229,8 +223,6 @@ class PloidyWorkspace:
         for j in range(self.num_contigs):
             for k in range(self.num_ploidy_states_j[j]):
                 ploidy = self.ploidy_j_k[j][k]
-                self.ploidy_jk[j, k] = ploidy
-                self.is_ploidy_in_ploidy_state_jkl[j, k, ploidy] = 1
                 self.is_ploidy_in_ploidy_state_j_kl[j][k, ploidy] = 1
 
         for i, contig_tuple in enumerate(self.contig_tuples):
@@ -238,8 +230,7 @@ class PloidyWorkspace:
             self.ploidy_state_priors_ik[i, :len(unpadded_priors)] = unpadded_priors
             for contig in contig_tuple:
                 j = self.contig_to_index_map[contig]
-                self.is_contig_in_contig_tuple_ij[i, j] = 1
-                self.ploidy_priors_jl[j] = np.sum(self.ploidy_state_priors_ik[i, :, np.newaxis] * self.is_ploidy_in_ploidy_state_jkl[j, :, :], axis=0)
+                self.ploidy_priors_jl[j] = np.sum(self.ploidy_state_priors_ik[i, :, np.newaxis] * self.is_ploidy_in_ploidy_state_j_kl[j], axis=0)
 
         # count-distribution data
         hist_sjm = np.zeros((self.num_samples, self.num_contigs, self.num_counts), dtype=types.med_uint)
@@ -373,22 +364,14 @@ class PloidyModel(GeneralizedContinuousModel):
         mosaicism_bias_upper_bound = ploidy_config.mosaicism_bias_upper_bound
         mosaicism_bias_scale = ploidy_config.mosaicism_bias_scale
         contig_tuples = ploidy_workspace.contig_tuples
-        num_contig_tuples = ploidy_workspace.num_contig_tuples
         num_samples = ploidy_workspace.num_samples
         num_contigs = ploidy_workspace.num_contigs
         counts_m = ploidy_workspace.counts_m
         contig_to_index_map = ploidy_workspace.contig_to_index_map
         mask_sjm = ploidy_workspace.mask_sjm
         hist_sjm = ploidy_workspace.hist_sjm
-        ploidy_state_priors_ik = ploidy_workspace.ploidy_state_priors_ik
         ploidy_state_priors_i_k = ploidy_workspace.ploidy_state_priors_i_k
-        ploidy_jk = ploidy_workspace.ploidy_jk
         ploidy_j_k = ploidy_workspace.ploidy_j_k
-        max_num_ploidy_states = self.ploidy_workspace.max_num_ploidy_states
-        is_contig_in_contig_tuple_ij = self.ploidy_workspace.is_contig_in_contig_tuple_ij
-        is_ploidy_in_ploidy_state_jkl = self.ploidy_workspace.is_ploidy_in_ploidy_state_jkl
-        is_ploidy_in_ploidy_state_j_kl = self.ploidy_workspace.is_ploidy_in_ploidy_state_j_kl
-        num_ploidies = self.ploidy_workspace.num_ploidies
         d_s_testval = self.ploidy_workspace.d_s_testval
         eps = self.ploidy_workspace.eps
 
@@ -442,35 +425,36 @@ class PloidyModel(GeneralizedContinuousModel):
                    for j in range(num_contigs)]
 
         psi_js = Exponential(name='psi_js',
-                             lam=1000.0, #1.0 / ploidy_config.psi_scale,
+                             lam=100.0, #1.0 / ploidy_config.psi_scale,
                              shape=(num_contigs, num_samples))
         register_as_sample_specific(psi_js, sample_axis=1)
         alpha_js = tt.inv((tt.exp(psi_js) - 1.0 + eps))
 
-        p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-                                                alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
-                          .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
-                   for j in range(num_contigs)]
+        # p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+        #                                         alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
+        #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
+        #            for j in range(num_contigs)]
 
-        # logp_j_skm = [NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-        #                                     alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
-        #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
-        #               for j in range(num_contigs)]
+        logp_j_skm = [NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+                                            alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
+                          .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
+                      for j in range(num_contigs)]
 
-        def _logp_hist_j_skm(_hist_sjm):
-            logp_hist_j_skm = [pm.Poisson.dist(mu=self.ploidy_workspace.num_occurrences_tot_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps) \
-                                   .logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
-                               for j in range(num_contigs)]
-            return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-                   (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]])
-                    for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
-            # return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-            #         (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]])
-            #         for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
+        def _logp_hist(_hist_sjm):
+            # logp_hist_j_skm = [pm.Poisson.dist(mu=self.ploidy_workspace.num_occurrences_tot_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps) \
+            #                        .logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
+            #                    for j in range(num_contigs)]
+            # return tt.sum([tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
+            #         tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+            #         pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]], axis=1))
+            #         for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
+            return tt.sum([tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
+                           tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+                                  pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]], axis=1))
+                           for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
         DensityDist(name='hist_sjm',
-                    logp=lambda _hist_sjm: tt.sum([pm.logsumexp(logp_hist_skm, axis=1)
-                                                   for logp_hist_skm in _logp_hist_j_skm(_hist_sjm)]),
+                    logp=lambda _hist_sjm: _logp_hist(_hist_sjm),
                     observed=hist_sjm)
 
 
@@ -512,10 +496,10 @@ class PloidyEmissionBasicSampler:
         print(1. / (np.exp(psi_js) - 1))
         print("b_j_norm")
         print(b_j_norm)
-        print("np.exp(log_ploidy_emission_sjl)")
-        print(np.exp(log_ploidy_emission_sjl))
-        print("np.exp(self.ploidy_workspace.log_q_ploidy_sjl)")
-        print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl.eval()))
+        # print("np.exp(log_ploidy_emission_sjl)")
+        # print(np.exp(log_ploidy_emission_sjl))
+        # print("np.exp(self.ploidy_workspace.log_q_ploidy_sjl)")
+        # print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl.eval()))
         return log_ploidy_emission_sjl
         # return self._simultaneous_log_ploidy_emission_sampler()
 
