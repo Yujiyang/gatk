@@ -225,7 +225,8 @@ class PloidyWorkspace:
         for i, contig_tuple in enumerate(self.contig_tuples):
             for contig in contig_tuple:
                 j = self.contig_to_index_map[contig]
-                self.ploidy_priors_jl[j] = np.dot(self.ploidy_state_priors_i_k[i], self.is_ploidy_in_ploidy_state_j_kl[j])
+                self.ploidy_priors_jl[j] = np.dot(np.array(self.ploidy_state_priors_i_k[i]),
+                                                  self.is_ploidy_in_ploidy_state_j_kl[j])
 
         # count-distribution data
         hist_sjm = np.zeros((self.num_samples, self.num_contigs, self.num_counts), dtype=types.med_uint)
