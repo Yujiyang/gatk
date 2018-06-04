@@ -16,6 +16,7 @@ import org.broadinstitute.barclay.argparser.CommandLineProgramProperties;
 import org.broadinstitute.barclay.help.DocumentedFeature;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
 import org.broadinstitute.hellbender.cmdline.programgroups.StructuralVariantDiscoveryProgramGroup;
+import org.broadinstitute.hellbender.engine.datasources.ReferenceMultiSource;
 import org.broadinstitute.hellbender.engine.filters.ReadFilter;
 import org.broadinstitute.hellbender.engine.filters.ReadFilterLibrary;
 import org.broadinstitute.hellbender.engine.spark.GATKSparkTool;
@@ -23,10 +24,9 @@ import org.broadinstitute.hellbender.exceptions.GATKException;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.spark.sv.StructuralVariationDiscoveryPipelineSpark;
 import org.broadinstitute.hellbender.tools.spark.sv.discovery.alignment.*;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.CpxVariantInterpreter;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.SegmentedCpxVariantSimpleVariantExtractor;
-import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.SimpleNovelAdjacencyInterpreter;
+import org.broadinstitute.hellbender.tools.spark.sv.discovery.inference.*;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVIntervalTree;
+import org.broadinstitute.hellbender.tools.spark.sv.utils.SVLocalContext;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVUtils;
 import org.broadinstitute.hellbender.tools.spark.sv.utils.SVVCFWriter;
 import org.broadinstitute.hellbender.utils.Utils;
@@ -112,6 +112,9 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
             fullName = "non-canonical-contig-names-file", optional = true)
     private String nonCanonicalChromosomeNamesFile;
 
+    @Argument(doc = "path to dir for assembled fastqs", fullName = "fastq-dir", optional = true)
+    private String fastqDir;
+
     @Argument(doc = "prefix for output files (including VCF files and if enabled, the signaling assembly contig's alignments); sample name will be appended after the provided argument",
             shortName = StandardArgumentDefinitions.OUTPUT_SHORT_NAME,
             fullName = StandardArgumentDefinitions.OUTPUT_LONG_NAME)
@@ -155,7 +158,7 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
         final AssemblyContigsClassifiedByAlignmentSignatures contigsByPossibleRawTypes =
                 preprocess(svDiscoveryInputMetaData, assemblyRawAlignments);
 
-        dispatchJobs(ctx, contigsByPossibleRawTypes, svDiscoveryInputMetaData, assemblyRawAlignments, writeSAMFiles);
+        dispatchJobs(ctx, contigsByPossibleRawTypes, svDiscoveryInputMetaData, assemblyRawAlignments, fastqDir, writeSAMFiles);
     }
 
 
@@ -282,6 +285,7 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
                                     final AssemblyContigsClassifiedByAlignmentSignatures contigsByPossibleRawTypes,
                                     final SvDiscoveryInputMetaData svDiscoveryInputMetaData,
                                     final JavaRDD<GATKRead> assemblyRawAlignments,
+                                    final String pathToFastq,
                                     final boolean writeSAMFiles) {
 
         final String outputPrefixWithSampleName = svDiscoveryInputMetaData.getOutputPath();
@@ -307,6 +311,7 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
                     svDiscoveryInputMetaData.getSampleSpecificData().getHeaderBroadcast().getValue());
         }
 
+        // reinterpret complex variants
         final JavaRDD<VariantContext> complexVariantsRDD = ctx.parallelize(complexVariants);
         final SegmentedCpxVariantSimpleVariantExtractor.ExtractedSimpleVariants reInterpretedSimple =
                 SegmentedCpxVariantSimpleVariantExtractor.extract(complexVariantsRDD, svDiscoveryInputMetaData, assemblyRawAlignments);
@@ -316,6 +321,32 @@ public final class SvDiscoverFromLocalAssemblyContigAlignmentsSpark extends GATK
         final String derivedMultiSegmentSimpleVCF = outputPrefixWithSampleName + "cpx_reinterpreted_simple_multi_seg.vcf";
         SVVCFWriter.writeVCF(reInterpretedSimple.getReInterpretZeroOrOneSegmentCalls(), derivedOneSegmentSimpleVCF, refSeqDict, toolLogger);
         SVVCFWriter.writeVCF(reInterpretedSimple.getReInterpretMultiSegmentsCalls(), derivedMultiSegmentSimpleVCF, refSeqDict, toolLogger);
+
+        // linked inversion breakpoints
+        if (pathToFastq != null ){
+            final List<InversionBreakendPreFilter.OverlappingPair> preprocessingResult = InversionBreakendPreFilter
+                    .preprocess(
+                            simpleVariants.stream().filter(SVLocalContext::indicatesInversion)
+                                    .map(SVLocalContext.InvBreakEndContext::new).collect(Collectors.toList()),
+                            complexVariants,
+                            100_000, 30,
+                            outputPrefixWithSampleName, refSeqDict, toolLogger);
+
+            if (preprocessingResult.isEmpty()) {
+                toolLogger.warn("No matched inversion breakpoint pairs found. This indicates something went wrong.");
+                return;
+            }
+
+            final ReferenceMultiSource reference = svDiscoveryInputMetaData.getReferenceData().getReferenceBroadcast().getValue();
+            final List<VariantContext> variantContexts = LinkedInversionBreakpointsInference
+                    .makeInterpretation(preprocessingResult,
+                            pathToFastq,
+                            reference, toolLogger);
+
+            // TODO: 5/16/18 artifact that we currently don't have sample columns for discovery VCF (until genotyping code is in)
+            final String vcfName = outputPrefixWithSampleName + "inversions_from_bnds.vcf" ;
+            SVVCFWriter.writeVCF(variantContexts, vcfName, refSeqDict, toolLogger);
+        }
     }
 
     //==================================================================================================================

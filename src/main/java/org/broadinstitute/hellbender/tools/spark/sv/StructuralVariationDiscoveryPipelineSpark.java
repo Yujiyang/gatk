@@ -200,7 +200,7 @@ public class StructuralVariationDiscoveryPipelineSpark extends GATKSparkTool {
 
         // TODO: 1/14/18 this is the next version of precise variant calling
         if ( expInterpret != null ) {
-            experimentalInterpretation(ctx, assembledEvidenceResults, svDiscoveryInputMetaData);
+            experimentalInterpretation(ctx, assembledEvidenceResults, svDiscoveryInputMetaData, evidenceAndAssemblyArgs.fastqDir);
         }
     }
 
@@ -277,7 +277,8 @@ public class StructuralVariationDiscoveryPipelineSpark extends GATKSparkTool {
 
     private static void experimentalInterpretation(final JavaSparkContext ctx,
                                                    final FindBreakpointEvidenceSpark.AssembledEvidenceResults assembledEvidenceResults,
-                                                   final SvDiscoveryInputMetaData svDiscoveryInputMetaData) {
+                                                   final SvDiscoveryInputMetaData svDiscoveryInputMetaData,
+                                                   final String pathToFastq) {
 
         final JavaRDD<GATKRead> assemblyRawAlignments = getContigRawAlignments(ctx, assembledEvidenceResults, svDiscoveryInputMetaData);
 
@@ -288,7 +289,7 @@ public class StructuralVariationDiscoveryPipelineSpark extends GATKSparkTool {
                 = SvDiscoverFromLocalAssemblyContigAlignmentsSpark.preprocess(svDiscoveryInputMetaData, assemblyRawAlignments);
 
         SvDiscoverFromLocalAssemblyContigAlignmentsSpark.dispatchJobs(ctx, contigsByPossibleRawTypes,
-                svDiscoveryInputMetaData, assemblyRawAlignments, true);
+                svDiscoveryInputMetaData, assemblyRawAlignments, pathToFastq, true);
     }
 
     private static JavaRDD<GATKRead> getContigRawAlignments(final JavaSparkContext ctx,
