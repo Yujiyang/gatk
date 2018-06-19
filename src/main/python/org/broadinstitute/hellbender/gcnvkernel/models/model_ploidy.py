@@ -8,6 +8,7 @@ import theano as th
 import theano.tensor as tt
 from pymc3 import Normal, Deterministic, DensityDist, Dirichlet, Bound, Uniform, NegativeBinomial, Poisson, Gamma, Exponential
 from typing import List, Dict, Set, Tuple
+import matplotlib.pyplot as plt
 
 from . import commons
 from .fancy_model import GeneralizedContinuousModel
@@ -15,8 +16,6 @@ from .. import config, types
 from ..structs.interval import Interval
 from ..structs.metadata import IntervalListMetadata, SampleMetadataCollection
 from ..tasks.inference_task_base import HybridInferenceParameters
-
-import matplotlib.pyplot as plt
 
 _logger = logging.getLogger(__name__)
 np.set_printoptions(threshold=np.inf)
@@ -208,10 +207,10 @@ class PloidyWorkspace:
             "Some contigs do not have ploidy priors"
 
         self.contig_to_index_map = {contig: index for index, contig in enumerate(self.contigs)}
-
         self.num_ploidy_states_j = np.array([len(ploidy_k) for ploidy_k in self.ploidy_j_k])
         self.num_ploidies = np.max([np.max(ploidy_k) for ploidy_k in self.ploidy_j_k]) + 1
-
+        self.is_contig_in_contig_tuple_ij = np.zeros((self.num_contig_tuples, self.num_contigs),
+                                                     dtype=types.small_uint)
         self.is_ploidy_in_ploidy_state_j_kl = [np.zeros((self.num_ploidy_states_j[j], self.num_ploidies))
                                                for j in range(self.num_contigs)]
         self.ploidy_priors_jl = 1E-10 * np.ones((self.num_contigs, self.num_ploidies),
@@ -225,68 +224,27 @@ class PloidyWorkspace:
         for i, contig_tuple in enumerate(self.contig_tuples):
             for contig in contig_tuple:
                 j = self.contig_to_index_map[contig]
-                self.ploidy_priors_jl[j] = np.dot(np.array(self.ploidy_state_priors_i_k[i]),
-                                                  self.is_ploidy_in_ploidy_state_j_kl[j])
+                self.is_contig_in_contig_tuple_ij[i, j] = 1
+                self.ploidy_priors_jl[j] = np.sum(self.ploidy_state_priors_i_k[i][:, np.newaxis] * self.is_ploidy_in_ploidy_state_j_kl[j], axis=0)
 
         # count-distribution data
-        hist_sjm = np.zeros((self.num_samples, self.num_contigs, self.num_counts), dtype=types.med_uint)
+        self.hist_sjm_full = np.zeros((self.num_samples, self.num_contigs, self.num_counts), dtype=types.med_uint)
         for si, sample_name in enumerate(self.sample_names):
             sample_metadata = sample_metadata_collection.get_sample_coverage_metadata(sample_name)
-            hist_sjm[si, :] = sample_metadata.hist_jm[:]
+            self.hist_sjm_full[si, :] = sample_metadata.hist_jm[:]
+
 
         # mask for count bins
-        mask_sjm, self.counts_m = self._construct_mask(hist_sjm)
+        mask_sjm, self.counts_m = self._construct_mask(self.hist_sjm_full)
         self.mask_sjm = mask_sjm[:, :, self.counts_m]
 
         average_ploidy = 2. # TODO
-        self.d_s_testval = np.median(np.sum(hist_sjm * np.arange(hist_sjm.shape[2]), axis=-1) / np.sum(hist_sjm, axis=-1), axis=-1) / average_ploidy
+        self.d_s_testval = np.median(np.sum(self.hist_sjm_full * np.arange(self.hist_sjm_full.shape[2]), axis=-1) / np.sum(self.hist_sjm_full, axis=-1), axis=-1) / average_ploidy
 
-        self.num_occurrences_tot_sj = np.sum(hist_sjm, axis=2)
+        self.num_occurrences_tot_sj = np.sum(self.hist_sjm_full, axis=2)  # includes masked count bins
 
         self.hist_sjm : types.TensorSharedVariable = \
-            th.shared(hist_sjm[:, :, self.counts_m], name='hist_sjm', borrow=config.borrow_numpy)
-
-        for s in range(self.num_samples):
-            fig, ax = plt.subplots()
-            for i, contig_tuple in enumerate(self.contig_tuples):
-                for contig in contig_tuple:
-                    j = self.contig_to_index_map[contig]
-                    hist_m_masked = hist_sjm[s, j][mask_sjm[s, j]]
-                    plt.semilogy(hist_sjm[s, j], color='b', lw=0.5)
-                    plt.semilogy(np.arange(hist_sjm.shape[2])[mask_sjm[s, j]], hist_m_masked, color='r', lw=3)
-                    y_max = 2 * np.max(hist_sjm[s, j])
-                    ax.set_xlim([0, hist_sjm.shape[2]])
-                    ax.set_ylim([1, y_max])
-            ax.set_xlabel('count', size=14)
-            ax.set_ylabel('number of intervals', size=14)
-            fig.tight_layout(pad=0.1)
-            fig.savefig('/home/slee/working/gatk/test_files/sample_{0}.png'.format(s))
-
-        # print('ploidy_states_i_k')
-        # print(self.ploidy_states_i_k)
-        # print('ploidy_j_k')
-        # print(self.ploidy_j_k)
-        # print('ploidy_state_priors_ik')
-        # print(self.ploidy_state_priors_ik)
-        # print('is_contig_in_contig_tuple_ij')
-        # print(self.is_contig_in_contig_tuple_ij)
-        # print('is_ploidy_in_ploidy_state_jkl')
-        # print(self.is_ploidy_in_ploidy_state_jkl)
-        # print('ploidy_jk')
-        # print(self.ploidy_jk)
-        # print('ploidy_state_priors_ik')
-        # print(self.ploidy_state_priors_ik)
-        # print('ploidy_priors_jl')
-        # print(self.ploidy_priors_jl)
-        # print('counts_m')
-        # print(self.counts_m)
-        # print('hist_sjm')
-        # print(hist_sjm[:, :, self.counts_m])
-
-        # ploidy log priors
-        self.log_p_ploidy_jl: types.TensorSharedVariable = \
-            th.shared(np.log(self.ploidy_priors_jl),
-                      name='log_p_ploidy_sjl', borrow=config.borrow_numpy)
+            th.shared(self.hist_sjm_full[:, :, self.counts_m], name='hist_sjm', borrow=config.borrow_numpy)
 
         # ploidy log posteriors (initialize to priors)
         self.log_q_ploidy_sjl: types.TensorSharedVariable = \
@@ -356,9 +314,9 @@ class PloidyModel(GeneralizedContinuousModel):
         contig_bias_lower_bound = ploidy_config.contig_bias_lower_bound
         contig_bias_upper_bound = ploidy_config.contig_bias_upper_bound
         contig_bias_scale = ploidy_config.contig_bias_scale
-        mosaicism_bias_lower_bound = ploidy_config.mosaicism_bias_lower_bound
-        mosaicism_bias_upper_bound = ploidy_config.mosaicism_bias_upper_bound
-        mosaicism_bias_scale = ploidy_config.mosaicism_bias_scale
+        # mosaicism_bias_lower_bound = ploidy_config.mosaicism_bias_lower_bound
+        # mosaicism_bias_upper_bound = ploidy_config.mosaicism_bias_upper_bound
+        # mosaicism_bias_scale = ploidy_config.mosaicism_bias_scale
         contig_tuples = ploidy_workspace.contig_tuples
         num_samples = ploidy_workspace.num_samples
         num_contigs = ploidy_workspace.num_contigs
@@ -420,34 +378,44 @@ class PloidyModel(GeneralizedContinuousModel):
                    tt.maximum(ploidy_j_k[j][np.newaxis, :], e_js[j].dimshuffle(0, 'x'))
                    for j in range(num_contigs)]
 
-        psi_js = Exponential(name='psi_js',
-                             lam=100.0, #1.0 / ploidy_config.psi_scale,
-                             shape=(num_contigs, num_samples))
-        register_as_sample_specific(psi_js, sample_axis=1)
-        alpha_js = tt.inv((tt.exp(psi_js) - 1.0 + eps))
+        # psi_js = Exponential(name='psi_js',
+        #                      lam=10.0, #1.0 / ploidy_config.psi_scale,
+        #                      shape=(num_contigs, num_samples))
+        # register_as_sample_specific(psi_js, sample_axis=1)
+        # alpha_js = tt.inv((tt.exp(psi_js) - 1.0 + eps))
+        alpha_js = pm.Uniform('alpha_js',
+                              upper=10000.,
+                              shape=(num_contigs, num_samples))
+        register_as_sample_specific(alpha_js, sample_axis=1)
+        psi_js = pm.Deterministic('psi_js', alpha_js)
 
-        # p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-        #                                         alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
-        #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
-        #            for j in range(num_contigs)]
+        p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+                                                alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
+                          .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
+                   for j in range(num_contigs)]
 
-        logp_j_skm = [NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-                                            alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
-                          .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
-                      for j in range(num_contigs)]
+        # logp_j_skm = [NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+        #                                     alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
+        #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
+        #               for j in range(num_contigs)]
 
-        def _logp_hist(_hist_sjm):
-            # logp_hist_j_skm = [pm.Poisson.dist(mu=self.ploidy_workspace.num_occurrences_tot_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps) \
-            #                        .logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
-            #                    for j in range(num_contigs)]
-            # return tt.sum([tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
-            #                tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-            #                       pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]], axis=1))
-            #                for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
-            return tt.sum([tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
-                           tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-                                  pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]], axis=1))
-                           for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
+        hist_norm_sj = pm.Uniform('hist_norm_sj',
+                                  shape=(num_samples, num_contigs))
+        register_as_sample_specific(hist_norm_sj, sample_axis=0)
+
+        hist_mu_j_skm = [pm.Deterministic('hist_mu_%d_skm' % j,
+                                          self.ploidy_workspace.num_occurrences_tot_sj[:, j, np.newaxis, np.newaxis] * hist_norm_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps)
+                         for j in range(num_contigs)]
+
+        def _logp_hist_j_skm(_hist_sjm):
+            logp_hist_j_skm = [pm.Poisson.dist(mu=hist_mu_j_skm[j]).logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
+                               for j in range(num_contigs)]
+            return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+                   (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]])
+                    for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
+            # return [mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+            #         (tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]])
+            #         for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
 
         DensityDist(name='hist_sjm',
                     logp=lambda _hist_sjm: _logp_hist(_hist_sjm),
@@ -483,7 +451,8 @@ class PloidyEmissionBasicSampler:
         d_s = out[1]
         psi_js = out[2]
         b_j_norm = out[3]
-        pi_i_sk = out[4:]
+        pi_i_sk = out[4:4 + self.ploidy_workspace.num_contig_tuples]
+        hist_mu_j_skm = out[4 + self.ploidy_workspace.num_contig_tuples:]
         print("pi_i_sk")
         print(pi_i_sk)
         print("d_s")
@@ -492,10 +461,31 @@ class PloidyEmissionBasicSampler:
         print(1. / (np.exp(psi_js) - 1))
         print("b_j_norm")
         print(b_j_norm)
-        # print("np.exp(log_ploidy_emission_sjl)")
-        # print(np.exp(log_ploidy_emission_sjl))
-        # print("np.exp(self.ploidy_workspace.log_q_ploidy_sjl)")
-        # print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl.eval()))
+        print("np.exp(log_ploidy_emission_sjl)")
+        print(np.exp(log_ploidy_emission_sjl))
+        print("np.exp(self.ploidy_workspace.log_q_ploidy_sjl)")
+        print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl.eval()))
+
+        counts_m = self.ploidy_workspace.counts_m
+        hist_sjm_full = self.ploidy_workspace.hist_sjm_full
+        hist_sjm = self.ploidy_workspace.hist_sjm_full[:, :, counts_m]
+        for s in range(self.ploidy_workspace.num_samples):
+            fig, ax = plt.subplots()
+            for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples):
+                for contig in contig_tuple:
+                    k = np.argmax(pi_i_sk[i][s])
+                    j = self.ploidy_workspace.contig_to_index_map[contig]
+                    plt.semilogy(hist_sjm_full[s, j], color='b', lw=0.5)
+                    plt.semilogy(counts_m, hist_sjm[s, j], color='r', lw=3)
+                    plt.semilogy(counts_m, hist_mu_j_skm[j][s, k], color='g', lw=3)
+                    y_max = 2 * np.max(hist_sjm_full[s, j])
+                    ax.set_xlim([0, hist_sjm_full.shape[2]])
+                    ax.set_ylim([1, y_max])
+            ax.set_xlabel('count', size=14)
+            ax.set_ylabel('number of intervals', size=14)
+            fig.tight_layout(pad=0.1)
+            fig.savefig('/home/slee/working/gatk/test_files/sample_{0}.png'.format(s))
+
         return log_ploidy_emission_sjl
         # return self._simultaneous_log_ploidy_emission_sampler()
 
@@ -516,7 +506,10 @@ class PloidyEmissionBasicSampler:
             approx, self.ploidy_model['psi_js'], size=self.samples_per_round)
         b_j_norm = commons.stochastic_node_mean_symbolic(
             approx, self.ploidy_model['b_j_norm'], size=self.samples_per_round)
-        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js, b_j_norm] + pi_i_sk)
+        hist_mu_j_skm = [commons.stochastic_node_mean_symbolic(
+            approx, self.ploidy_model['hist_mu_%d_skm' % j], size=self.samples_per_round)
+            for j in range(self.ploidy_workspace.num_contigs)]
+        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js, b_j_norm] + pi_i_sk + hist_mu_j_skm)
         # return th.function(inputs=[], outputs=log_ploidy_emission_sjl)
 
 
