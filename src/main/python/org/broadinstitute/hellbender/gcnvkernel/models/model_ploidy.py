@@ -235,8 +235,10 @@ class PloidyWorkspace:
 
 
         # mask for count bins
-        mask_sjm, self.counts_m = self._construct_mask(self.hist_sjm_full)
-        self.mask_sjm = mask_sjm[:, :, self.counts_m]
+        self.mask_sjm, self.counts_m = self._construct_mask(self.hist_sjm_full)
+
+        print(len(self.counts_m))
+        print(self.counts_m)
 
         average_ploidy = 2. # TODO
         self.d_s_testval = np.median(np.sum(self.hist_sjm_full * np.arange(self.hist_sjm_full.shape[2]), axis=-1) / np.sum(self.hist_sjm_full, axis=-1), axis=-1) / average_ploidy
@@ -293,7 +295,7 @@ class PloidyWorkspace:
             if np.any(mask_sjm[:, :, m]):
                 counts_m.append(m)
 
-        return mask_sjm, counts_m
+        return mask_sjm[:, :, counts_m], np.array(counts_m, dtype=types.small_uint)
 
 
 class PloidyModel(GeneralizedContinuousModel):
@@ -378,31 +380,24 @@ class PloidyModel(GeneralizedContinuousModel):
                    tt.maximum(ploidy_j_k[j][np.newaxis, :], e_js[j].dimshuffle(0, 'x'))
                    for j in range(num_contigs)]
 
-        # psi_js = Exponential(name='psi_js',
-        #                      lam=10.0, #1.0 / ploidy_config.psi_scale,
-        #                      shape=(num_contigs, num_samples))
-        # register_as_sample_specific(psi_js, sample_axis=1)
-        # alpha_js = tt.inv((tt.exp(psi_js) - 1.0 + eps))
-        alpha_js = pm.Uniform('alpha_js',
-                              upper=10000.,
-                              shape=(num_contigs, num_samples))
-        register_as_sample_specific(alpha_js, sample_axis=1)
-        psi_js = pm.Deterministic('psi_js', alpha_js)
+        psi_js = Exponential(name='psi_js',
+                             lam=100.0, #1.0 / ploidy_config.psi_scale,
+                             shape=(num_contigs, num_samples))
+        register_as_sample_specific(psi_js, sample_axis=1)
+        alpha_js = tt.inv((tt.exp(psi_js) - 1.0 + eps))
 
-        p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-                                                alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
-                          .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
-                   for j in range(num_contigs)]
+        logp_j_skm = [commons.negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+                                                     alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
+                                                     value=counts_m[np.newaxis, np.newaxis, :])
+                      for j in range(num_contigs)]
 
-        # logp_j_skm = [NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-        #                                     alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
-        #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
-        #               for j in range(num_contigs)]
-
+        # p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+        #                                         alpha=alpha_js[j].dimshuffle(0, 'x', 'x'))
+        #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0)))
+        #            for j in range(num_contigs)]
         # hist_norm_sj = pm.Uniform('hist_norm_sj',
         #                           shape=(num_samples, num_contigs))
         # register_as_sample_specific(hist_norm_sj, sample_axis=0)
-        #
         # hist_mu_j_skm = [pm.Deterministic('hist_mu_%d_skm' % j,
         #                                   self.ploidy_workspace.num_occurrences_tot_sj[:, j, np.newaxis, np.newaxis] * hist_norm_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps)
         #                  for j in range(num_contigs)
