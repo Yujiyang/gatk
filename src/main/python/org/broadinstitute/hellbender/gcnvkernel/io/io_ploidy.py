@@ -205,8 +205,12 @@ def get_ploidy_state_priors_map_from_tsv_file(input_path: str,
 
     # read in the relative (unnormalized) probabilities
     raw_ploidy_state_priors_map = defaultdict(dict)
+
     for _, row in ploidy_state_priors_pd.iterrows():
-        contig_tuple = tuple(x for x in row['CONTIG_TUPLE'][1:-1].split(','))
+        contig_tuple = tuple(contig for contig in row['CONTIG_TUPLE'][1:-1].split(','))
+        contig_tuple_set = set(contig_tuple)
+        assert len(contig_tuple_set) == len(contig_tuple), \
+            "Contig tuples cannot contain duplicate contigs."
         ploidy_state = tuple(int(x) for x in row['PLOIDY_STATE'][1:-1].split(','))
         assert len(contig_tuple) == len(ploidy_state)
         relative_prob = row['RELATIVE_PROBABILITY']
@@ -216,6 +220,12 @@ def get_ploidy_state_priors_map_from_tsv_file(input_path: str,
         assert ploidy_state not in raw_ploidy_state_priors_map[contig_tuple], \
             "Relative probability should be specified only once for each contig-tuple--ploidy-state combination."
         raw_ploidy_state_priors_map[contig_tuple][ploidy_state] = relative_prob
+
+    contig_set = set()
+    for i, contig_tuple in enumerate(raw_ploidy_state_priors_map.keys()):
+        for j, contig in enumerate(contig_tuple):
+            assert contig not in contig_set, "Contig tuples must be disjoint."
+            contig_set.add(contig)
 
     # normalize the probabilities
     ploidy_state_priors_map = defaultdict(OrderedDict)

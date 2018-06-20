@@ -198,10 +198,11 @@ class PloidyWorkspace:
         self.contigs: List[str] = []
         for i, contig_tuple in enumerate(self.contig_tuples):
             for j, contig in enumerate(contig_tuple):
-                assert contig not in self.contigs, "Contig tuples must be disjoint."
                 self.contigs.append(contig)
                 self.ploidy_j_k.append(np.array([ploidy_state[j]
                                                  for ploidy_state in self.ploidy_states_i_k[i]]))
+
+        print(self.ploidy_state_priors_i_k)
 
         assert set(self.contigs) == interval_list_metadata.contig_set, \
             "The set of contigs present in the coverage files must match exactly " \
