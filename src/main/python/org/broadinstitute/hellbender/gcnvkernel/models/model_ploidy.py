@@ -241,10 +241,10 @@ class PloidyWorkspace:
         average_ploidy = 2. # TODO
         self.d_s_testval = np.median(np.sum(self.hist_sjm_full * np.arange(self.hist_sjm_full.shape[2]), axis=-1) / np.sum(self.hist_sjm_full, axis=-1), axis=-1) / average_ploidy
 
-        self.num_occurrences_tot_sj = np.sum(self.hist_sjm_full, axis=2)  # includes masked count bins
-
         self.hist_sjm : types.TensorSharedVariable = \
-            th.shared(np.array(self.hist_sjm_full[:, :, self.counts_m]), name='hist_sjm', borrow=config.borrow_numpy)
+            th.shared(self.hist_sjm_full[:, :, self.counts_m], name='hist_sjm', borrow=config.borrow_numpy)
+
+        self.num_occurrences_sj = np.sum(self.hist_sjm_full[:, :, self.counts_m], axis=2)
 
         # ploidy log posteriors (initialize to priors)
         self.log_q_ploidy_sjl: types.TensorSharedVariable = \
@@ -399,19 +399,16 @@ class PloidyModel(GeneralizedContinuousModel):
         #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
         #               for j in range(num_contigs)]
 
-        # logp_j_skm = [Poisson.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps)
-        #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
-        #               for j in range(num_contigs)]
-
         # hist_norm_sj = pm.Uniform('hist_norm_sj',
         #                           shape=(num_samples, num_contigs))
         # register_as_sample_specific(hist_norm_sj, sample_axis=0)
         #
         # hist_mu_j_skm = [pm.Deterministic('hist_mu_%d_skm' % j,
         #                                   self.ploidy_workspace.num_occurrences_tot_sj[:, j, np.newaxis, np.newaxis] * hist_norm_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps)
+        #                  for j in range(num_contigs)
+        # hist_mu_j_skm = [pm.Deterministic('hist_mu_%d_skm' % j,
+        #                                   self.ploidy_workspace.num_occurrences_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps)
         #                  for j in range(num_contigs)]
-        # for j in range(num_contigs):
-        #     register_as_sample_specific(hist_mu_j_skm[j], sample_axis=0)
 
         def _logp_hist(_hist_sjm):
             # logp_hist_j_skm = [pm.Poisson.dist(mu=hist_mu_j_skm[j]).logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
