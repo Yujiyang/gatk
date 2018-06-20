@@ -202,8 +202,6 @@ class PloidyWorkspace:
                 self.ploidy_j_k.append(np.array([ploidy_state[j]
                                                  for ploidy_state in self.ploidy_states_i_k[i]]))
 
-        print(self.ploidy_state_priors_i_k)
-
         assert set(self.contigs) == interval_list_metadata.contig_set, \
             "The set of contigs present in the coverage files must match exactly " \
             "the set of contigs present in the ploidy-state-priors file."
@@ -401,6 +399,10 @@ class PloidyModel(GeneralizedContinuousModel):
         #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
         #               for j in range(num_contigs)]
 
+        # logp_j_skm = [Poisson.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps)
+        #                   .logp(th.shared(np.array(counts_m, dtype=types.small_uint), borrow=config.borrow_numpy).dimshuffle('x', 'x', 0))
+        #               for j in range(num_contigs)]
+
         # hist_norm_sj = pm.Uniform('hist_norm_sj',
         #                           shape=(num_samples, num_contigs))
         # register_as_sample_specific(hist_norm_sj, sample_axis=0)
@@ -414,14 +416,14 @@ class PloidyModel(GeneralizedContinuousModel):
         def _logp_hist(_hist_sjm):
             # logp_hist_j_skm = [pm.Poisson.dist(mu=hist_mu_j_skm[j]).logp(_hist_sjm[:, j, :].dimshuffle(0, 'x', 1))
             #                    for j in range(num_contigs)]
-            # return tt.sum([tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
+            # return [tt.sum(tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
             #                tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-            #                       pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]], axis=1))
-            #                for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
-            return tt.sum([tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
+            #                       pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]], axis=1)))
+            #         for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
+            return [tt.sum(tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
                            tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-                                  pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]], axis=1))
-                           for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
+                                  pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]], axis=1)))
+                           for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
 
         DensityDist(name='hist_sjm', logp=_logp_hist, observed=hist_sjm)
 
@@ -453,25 +455,17 @@ class PloidyEmissionBasicSampler:
         out = self._simultaneous_log_ploidy_emission_sampler()
         log_ploidy_emission_sjl = out[0]
         d_s = out[1]
-        psi_js = out[2]
-        b_j_norm = out[3]
-        pi_i_sk = out[4:4 + self.ploidy_workspace.num_contig_tuples]
-        # hist_mu_j_skm = out[4 + self.ploidy_workspace.num_contig_tuples:]
+        b_j_norm = out[2]
+        pi_i_sk = out[3:]
         q_ploidy_sjl = np.exp(self.ploidy_workspace.log_q_ploidy_sjl.get_value(borrow=True))
         for s, q_ploidy_jl in enumerate(q_ploidy_sjl):
             print('sample_{0}:'.format(s), np.argmax(q_ploidy_jl, axis=1))
-        print("pi_i_sk")
-        print(pi_i_sk)
+        # print("pi_i_sk")
+        # print(pi_i_sk)
         print("d_s")
         print(d_s)
-        # print("1. / (np.exp(psi_js) - 1)")
-        # print(1. / (np.exp(psi_js) - 1))
         print("b_j_norm")
         print(b_j_norm)
-        # print("np.exp(log_ploidy_emission_sjl)")
-        # print(np.exp(log_ploidy_emission_sjl))
-        # print("np.exp(self.ploidy_workspace.log_q_ploidy_sjl)")
-        # print(np.exp(self.ploidy_workspace.log_q_ploidy_sjl.eval()))
 
         counts_m = self.ploidy_workspace.counts_m
         hist_sjm_full = self.ploidy_workspace.hist_sjm_full
@@ -480,7 +474,7 @@ class PloidyEmissionBasicSampler:
             fig, ax = plt.subplots()
             for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples):
                 for contig in contig_tuple:
-                    k = np.argmax(pi_i_sk[i][s])
+                    # k = np.argmax(pi_i_sk[i][s])
                     j = self.ploidy_workspace.contig_to_index_map[contig]
                     plt.semilogy(hist_sjm_full[s, j], color='b', lw=0.5)
                     plt.semilogy(counts_m, hist_sjm[s, j], color='r', lw=3)
@@ -509,14 +503,12 @@ class PloidyEmissionBasicSampler:
             for contig in contig_tuple]).dimshuffle(1, 0, 2)
         d_s = commons.stochastic_node_mean_symbolic(
             approx, self.ploidy_model['d_s'], size=self.samples_per_round)
-        psi_js = commons.stochastic_node_mean_symbolic(
-            approx, self.ploidy_model['psi_js'], size=self.samples_per_round)
         b_j_norm = commons.stochastic_node_mean_symbolic(
             approx, self.ploidy_model['b_j_norm'], size=self.samples_per_round)
         # hist_mu_j_skm = [commons.stochastic_node_mean_symbolic(
         #     approx, self.ploidy_model['hist_mu_%d_skm' % j], size=self.samples_per_round)
         #     for j in range(self.ploidy_workspace.num_contigs)]
-        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js, b_j_norm] + pi_i_sk)
+        return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, b_j_norm] + pi_i_sk)
         # return th.function(inputs=[], outputs=[log_ploidy_emission_sjl, d_s, psi_js, b_j_norm] + pi_i_sk + hist_mu_j_skm)
         # return th.function(inputs=[], outputs=log_ploidy_emission_sjl)
 
