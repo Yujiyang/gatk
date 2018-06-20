@@ -62,7 +62,7 @@ class SampleCoverageMetadata:
 
         # per-contig count distribution
         # j = contig index, m = count index
-        self.hist_jm = hist_jm.astype(types.med_uint)
+        self.hist_jm = np.array(hist_jm, dtype=types.med_uint)
         self.max_count = hist_jm.shape[1] - 1
         self.n_total = np.sum(hist_jm * np.arange(self.max_count + 1))
 
