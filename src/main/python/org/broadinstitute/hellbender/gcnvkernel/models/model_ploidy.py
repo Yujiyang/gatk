@@ -245,6 +245,9 @@ class PloidyWorkspace:
         self.hist_sjm : types.TensorSharedVariable = \
             th.shared(self.hist_sjm_full, name='hist_sjm', borrow=config.borrow_numpy)
 
+        cutoff = 0.01
+        self.hist_cutoff_sj = cutoff * np.sum(self.hist_sjm_full, axis=-1)
+
         # self.num_occurrences_sj = np.sum(self.hist_sjm_full[:, :, self.counts_m], axis=2)
 
         # ploidy log posteriors (initialize to priors)
@@ -325,6 +328,7 @@ class PloidyModel(GeneralizedContinuousModel):
         contig_to_index_map = ploidy_workspace.contig_to_index_map
         # mask_sjm = ploidy_workspace.mask_sjm
         hist_sjm = ploidy_workspace.hist_sjm
+        hist_cutoff_sj = ploidy_workspace.hist_cutoff_sj
         ploidy_state_priors_i_k = ploidy_workspace.ploidy_state_priors_i_k
         ploidy_j_k = ploidy_workspace.ploidy_j_k
         is_ploidy_in_ploidy_state_j_kl = ploidy_workspace.is_ploidy_in_ploidy_state_j_kl
@@ -380,11 +384,11 @@ class PloidyModel(GeneralizedContinuousModel):
                    # tt.maximum(ploidy_j_k[j][np.newaxis, :], error_rate_j[j])
                    for j in range(num_contigs)]
 
-        psi_js = Exponential(name='psi_js',
+        psi_s = Exponential(name='psi_s',
                              lam=100.0, #1.0 / ploidy_config.psi_scale,
-                             shape=(num_contigs, num_samples))
-        register_as_sample_specific(psi_js, sample_axis=1)
-        alpha_js = tt.inv((tt.exp(psi_js) - 1.0 + eps))
+                             shape=num_samples)
+        register_as_sample_specific(psi_s, sample_axis=0)
+        alpha_s = tt.inv((tt.exp(psi_s) - 1.0 + eps))
 
         def bound(logp, *conditions, **kwargs):
             broadcast_conditions = kwargs.get('broadcast_conditions', True)
@@ -400,11 +404,10 @@ class PloidyModel(GeneralizedContinuousModel):
                                       + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
                                       mu > 0, value > 0, alpha > 0, mask)   # mask out value = 0
 
-
         logp_j_skm = [negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-                                             alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
+                                             alpha=alpha_s.dimshuffle(0, 'x', 'x'),
                                              value=counts_m[np.newaxis, np.newaxis, :],
-                                             mask=hist_sjm[:, j, np.newaxis, :] > 100)
+                                             mask=hist_sjm[:, j, np.newaxis, :] > hist_cutoff_sj[:, j, np.newaxis, np.newaxis])
                       for j in range(num_contigs)]
 
         # p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
