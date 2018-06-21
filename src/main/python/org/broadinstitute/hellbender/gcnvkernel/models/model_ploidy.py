@@ -402,13 +402,13 @@ class PloidyModel(GeneralizedContinuousModel):
             return bound(pm_dist_math.binomln(value + alpha - 1, value)
                                       + pm_dist_math.logpow(mu / (mu + alpha), value)
                                       + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
-                                      mu > 0, value > 0, alpha > 0, mask)
+                                      mu > 0, value > 0, alpha > 0, mask)   # mask out value = 0
 
 
         logp_j_skm = [negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
                                              alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
                                              value=counts_m[np.newaxis, np.newaxis, :],
-                                             mask=hist_sjm[:, j, np.newaxis, :] > 10)
+                                             mask=hist_sjm[:, j, np.newaxis, :] > 100)
                       for j in range(num_contigs)]
 
         # p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,

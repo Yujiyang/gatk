@@ -38,7 +38,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
 //    private static final File OUTPUT_DIR = createTempDir("test-ploidy");
     private static final File OUTPUT_DIR = new File("/home/slee/working/gatk/test_files");
 
-    private static final List<File> COUNT_FILES = Arrays.asList(
+    private static final List<File> ANEUPLOIDY_COUNT_FILES = Arrays.asList(
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/cases/10C110552.cram.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/cases/10C112547.cram.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/cases/11C119003.cram.counts.hdf5"),
@@ -99,6 +99,39 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540306.cram.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540325.cram.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540328.cram.counts.hdf5")
+    );
+
+    private static final List<File> SFARI_COUNT_FILES = Arrays.asList(
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00089.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00090.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00091.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00092.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00115.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00117.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00118.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00119.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00137.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00138.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00139.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00140.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00255.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00256.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00259.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00314.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00318.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00320.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00469.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00472.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00473.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00517.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00519.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00520.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00521.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00534.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00535.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00536.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00537.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00604.counts.hdf5")
     );
 
     private static final class PloidyProfile {
@@ -218,11 +251,47 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     @Test(groups = {"python"})
     public void testAneuploidyCohort() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        COUNT_FILES.forEach(argsBuilder::addInput);
+        ANEUPLOIDY_COUNT_FILES.forEach(argsBuilder::addInput);
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors.tsv"))
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "250")
+                .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
+        runCommandLine(argsBuilder);
+    }
+
+    @Test(groups = {"python"})
+    public void testAneuploidyCohortFullPrior() {
+        final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
+        ANEUPLOIDY_COUNT_FILES.forEach(argsBuilder::addInput);
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors_full.tsv"))
+                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
+                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort-full")
+                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "250")
+                .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
+        runCommandLine(argsBuilder);
+    }
+
+    @Test(groups = {"python"})
+    public void testSFARICohort() {
+        final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
+        SFARI_COUNT_FILES.forEach(argsBuilder::addInput);
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors_hg19.tsv"))
+                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
+                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-sfari-cohort")
+                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
+                .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
+        runCommandLine(argsBuilder);
+    }
+
+    @Test(groups = {"python"})
+    public void testSFARICohortFullPrior() {
+        final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
+        SFARI_COUNT_FILES.forEach(argsBuilder::addInput);
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors_hg19_full.tsv"))
+                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
+                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-sfari-cohort-full")
+                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -251,7 +320,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     public void testCohortDuplicateFiles() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
         SIMULATED_COUNT_FILES.forEach(argsBuilder::addInput);
-        argsBuilder.addInput(COUNT_FILES.get(0));  //duplicate
+        argsBuilder.addInput(ANEUPLOIDY_COUNT_FILES.get(0));  //duplicate
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
