@@ -15,11 +15,12 @@ gcnvkernel.cli_commons.add_logging_args_to_argparse(parser)
 # add tool-specific args
 group = parser.add_argument_group(title="Required arguments")
 
-group.add_argument("--contig_count_distribution_collections_path",
+group.add_argument("--contig_count_distribution_collection_files",
                    type=str,
                    required=True,
+                   nargs='+',  # one or more
                    default=argparse.SUPPRESS,
-                   help="Path containing per-contig count-distribution files for all samples (in .tsv format)")
+                   help="List of per-contig count-distribution files for all samples (in .tsv format; must include sample name header)")
 
 group.add_argument("--input_model_path",
                    type=str,
@@ -76,13 +77,14 @@ if __name__ == "__main__":
     # check gcnvkernel version in the input model path
     gcnvkernel.io_commons.check_gcnvkernel_version_from_path(args.input_model_path)
 
-    # read contig ploidy prior map from the model
-    contig_ploidy_prior_file = os.path.join(args.input_model_path,
-                                            gcnvkernel.io_consts.default_contig_ploidy_prior_tsv_filename)
-    assert os.path.exists(contig_ploidy_prior_file) and os.path.isfile(contig_ploidy_prior_file), \
-        "The provided ploidy model is corrupted: it does not include contig ploidy priors .tsv file"
-    contig_ploidy_prior_map = gcnvkernel.io_ploidy.get_contig_ploidy_prior_map_from_tsv_file(
-        contig_ploidy_prior_file)
+    # read ploidy-state prior map from the model
+    ploidy_state_priors_table = os.path.join(args.input_model_path,
+                                            gcnvkernel.io_consts.default_ploidy_state_prior_tsv_filename)
+    assert os.path.exists(ploidy_state_priors_table) and os.path.isfile(ploidy_state_priors_table), \
+        "The provided ploidy model is corrupted: it does not include ploidy-state priors .tsv file"
+    # read ploidy-state prior map from file
+    ploidy_state_priors_map = gcnvkernel.io_ploidy.get_ploidy_state_priors_map_from_tsv_file(
+        ploidy_state_priors_table)
 
     # load interval list from the model
     interval_list_file = os.path.join(args.input_model_path, gcnvkernel.io_consts.default_interval_list_filename)
@@ -93,14 +95,14 @@ if __name__ == "__main__":
     # load sample coverage metadata
     sample_metadata_collection: gcnvkernel.SampleMetadataCollection = gcnvkernel.SampleMetadataCollection()
     sample_names = gcnvkernel.io_metadata.read_sample_coverage_metadata(
-        sample_metadata_collection, args.sample_coverage_metadata)
+        sample_metadata_collection, args.contig_count_distribution_collection_files)
 
     # generate intervals metadata
     intervals_metadata: gcnvkernel.IntervalListMetadata = gcnvkernel.IntervalListMetadata(interval_list)
 
-    # inject ploidy prior map to the dictionary of parsed args
+    # inject ploidy-state priors map to the dictionary of parsed args
     args_dict = args.__dict__
-    args_dict['contig_ploidy_prior_map'] = contig_ploidy_prior_map
+    args_dict['ploidy_state_priors_map'] = ploidy_state_priors_map
 
     # setup the case ploidy inference task
     ploidy_config = gcnvkernel.PloidyModelConfig.from_args_dict(args_dict)

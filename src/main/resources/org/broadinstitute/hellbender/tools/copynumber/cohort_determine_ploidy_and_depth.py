@@ -123,4 +123,4 @@ if __name__ == "__main__":
     shutil.copy(args.interval_list,
                 os.path.join(args.output_model_path, gcnvkernel.io_consts.default_interval_list_filename))
     shutil.copy(args.ploidy_state_priors_table,
-                os.path.join(args.output_model_path, gcnvkernel.io_consts.default_contig_ploidy_prior_tsv_filename))
+                os.path.join(args.output_model_path, gcnvkernel.io_consts.default_ploidy_state_prior_tsv_filename))

@@ -6,6 +6,7 @@ import numpy as np
 import pymc3 as pm
 import theano as th
 import theano.tensor as tt
+import pymc3.distributions.dist_math as pm_dist_math
 from pymc3 import Normal, Deterministic, DensityDist, Dirichlet, Bound, Uniform, NegativeBinomial, Poisson, Gamma, Exponential
 from typing import List, Dict, Set, Tuple
 import matplotlib.pyplot as plt
@@ -234,16 +235,21 @@ class PloidyWorkspace:
             self.hist_sjm_full[si] = sample_metadata.hist_jm[:, :]
 
 
-        # mask for count bins
-        self.mask_sjm, self.counts_m = self._construct_mask(self.hist_sjm_full)
+        # # mask for count bins
+        # self.mask_sjm, self.counts_m = self._construct_mask(self.hist_sjm_full)
+
+        self.counts_m = np.arange(self.num_counts, dtype=types.med_uint)
 
         average_ploidy = 2. # TODO
-        self.d_s_testval = np.median(np.sum(self.hist_sjm_full * np.arange(self.hist_sjm_full.shape[2]), axis=-1) / np.sum(self.hist_sjm_full, axis=-1), axis=-1) / average_ploidy
+        self.d_s_testval = np.median(np.sum(self.hist_sjm_full * np.arange(self.num_counts), axis=-1) / np.sum(self.hist_sjm_full, axis=-1), axis=-1) / average_ploidy
+
+        # self.hist_sjm : types.TensorSharedVariable = \
+        #     th.shared(self.hist_sjm_full[:, :, self.counts_m], name='hist_sjm', borrow=config.borrow_numpy)
 
         self.hist_sjm : types.TensorSharedVariable = \
-            th.shared(self.hist_sjm_full[:, :, self.counts_m], name='hist_sjm', borrow=config.borrow_numpy)
+            th.shared(self.hist_sjm_full, name='hist_sjm', borrow=config.borrow_numpy)
 
-        self.num_occurrences_sj = np.sum(self.hist_sjm_full[:, :, self.counts_m], axis=2)
+        # self.num_occurrences_sj = np.sum(self.hist_sjm_full[:, :, self.counts_m], axis=2)
 
         # ploidy log posteriors (initialize to priors)
         self.log_q_ploidy_sjl: types.TensorSharedVariable = \
@@ -260,39 +266,39 @@ class PloidyWorkspace:
     def _get_contig_set_from_interval_list(interval_list: List[Interval]) -> Set[str]:
         return {interval.contig for interval in interval_list}
 
-    @staticmethod
-    def _construct_mask(hist_sjm):
-        count_states = np.arange(0, hist_sjm.shape[2])
-        mode_sj = np.argmax(hist_sjm * (count_states >= 5), axis=2)
-        mask_sjm = np.full(np.shape(hist_sjm), False)
-        for s in range(np.shape(hist_sjm)[0]):
-            for j in range(np.shape(hist_sjm)[1]):
-                min_sj = np.argmin(hist_sjm[s, j, :mode_sj[s, j] + 1])
-                if mode_sj[s, j] <= 10:
-                    mode_sj[s, j] = 0
-                    cutoff = 0.
-                else:
-                    cutoff = 0.05
-                for m in range(mode_sj[s, j], np.shape(hist_sjm)[2]):
-                    if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
-                        if hist_sjm[s, j, m] > 0:
-                            mask_sjm[s, j, m] = True
-                    else:
-                        break
-                for m in range(mode_sj[s, j], min_sj, -1):
-                    if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
-                        if hist_sjm[s, j, m] > 0:
-                            mask_sjm[s, j, m] = True
-                    else:
-                        break
-            mask_sjm[:, :, 0] = False
-
-        counts_m = []
-        for m in range(hist_sjm.shape[2]):
-            if np.any(mask_sjm[:, :, m]):
-                counts_m.append(m)
-
-        return mask_sjm[:, :, counts_m], np.array(counts_m, dtype=types.small_uint)
+    # @staticmethod
+    # def _construct_mask(hist_sjm):
+    #     count_states = np.arange(0, hist_sjm.shape[2])
+    #     mode_sj = np.argmax(hist_sjm * (count_states >= 5), axis=2)
+    #     mask_sjm = np.full(np.shape(hist_sjm), False)
+    #     for s in range(np.shape(hist_sjm)[0]):
+    #         for j in range(np.shape(hist_sjm)[1]):
+    #             min_sj = np.argmin(hist_sjm[s, j, :mode_sj[s, j] + 1])
+    #             if mode_sj[s, j] <= 10:
+    #                 mode_sj[s, j] = 0
+    #                 cutoff = 0.
+    #             else:
+    #                 cutoff = 0.05
+    #             for m in range(mode_sj[s, j], np.shape(hist_sjm)[2]):
+    #                 if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
+    #                     if hist_sjm[s, j, m] > 0:
+    #                         mask_sjm[s, j, m] = True
+    #                 else:
+    #                     break
+    #             for m in range(mode_sj[s, j], min_sj, -1):
+    #                 if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
+    #                     if hist_sjm[s, j, m] > 0:
+    #                         mask_sjm[s, j, m] = True
+    #                 else:
+    #                     break
+    #         mask_sjm[:, :, 0] = False
+    #
+    #     counts_m = []
+    #     for m in range(hist_sjm.shape[2]):
+    #         if np.any(mask_sjm[:, :, m]):
+    #             counts_m.append(m)
+    #
+    #     return mask_sjm[:, :, counts_m], np.array(counts_m, dtype=types.small_uint)
 
 
 class PloidyModel(GeneralizedContinuousModel):
@@ -321,7 +327,7 @@ class PloidyModel(GeneralizedContinuousModel):
         num_contigs = ploidy_workspace.num_contigs
         counts_m = ploidy_workspace.counts_m
         contig_to_index_map = ploidy_workspace.contig_to_index_map
-        mask_sjm = ploidy_workspace.mask_sjm
+        # mask_sjm = ploidy_workspace.mask_sjm
         hist_sjm = ploidy_workspace.hist_sjm
         ploidy_state_priors_i_k = ploidy_workspace.ploidy_state_priors_i_k
         ploidy_j_k = ploidy_workspace.ploidy_j_k
@@ -366,16 +372,16 @@ class PloidyModel(GeneralizedContinuousModel):
             else:
                 pi_i_sk.append(Deterministic('pi_%d_sk' % i, var=tt.ones((num_samples, 1))))
 
-        e_js = Uniform('e_js',
-                       lower=0.,
-                       upper=error_rate_upper_bound,
-                       shape=(num_contigs, num_samples))
-        register_as_sample_specific(e_js, sample_axis=1)
+        error_rate_j = Uniform('error_rate_j',
+                               lower=0.,
+                               upper=error_rate_upper_bound,
+                               shape=num_contigs)
+        register_as_global(error_rate_j)
 
         mu_j_sk = [d_s.dimshuffle(0, 'x') * b_j_norm[j] * \
                    # (tt.maximum(ploidy_j_k[j][np.newaxis, :] + f_js[j].dimshuffle(0, 'x') * (ploidy_j_k[j][np.newaxis, :] > 0),
                    #             e_js[j].dimshuffle(0, 'x')))
-                   tt.maximum(ploidy_j_k[j][np.newaxis, :], e_js[j].dimshuffle(0, 'x'))
+                   tt.maximum(ploidy_j_k[j][np.newaxis, :], error_rate_j[j])
                    for j in range(num_contigs)]
 
         psi_js = Exponential(name='psi_js',
@@ -384,9 +390,24 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_sample_specific(psi_js, sample_axis=1)
         alpha_js = tt.inv((tt.exp(psi_js) - 1.0 + eps))
 
-        logp_j_skm = [commons.negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-                                                     alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
-                                                     value=counts_m[np.newaxis, np.newaxis, :])
+        def bound(logp, *conditions, **kwargs):
+            broadcast_conditions = kwargs.get('broadcast_conditions', True)
+            if broadcast_conditions:
+                alltrue = pm_dist_math.alltrue_elemwise
+            else:
+                alltrue = pm_dist_math.alltrue_scalar
+            return tt.switch(alltrue(conditions), logp, 0)
+
+        def negative_binomial_logp(mu, alpha, value):
+            return bound(pm_dist_math.binomln(value + alpha - 1, value)
+                                      + pm_dist_math.logpow(mu / (mu + alpha), value)
+                                      + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
+                                      mu > 0, value >= 10, alpha > 0)
+
+
+        logp_j_skm = [negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+                                             alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
+                                             value=counts_m[np.newaxis, np.newaxis, :])
                       for j in range(num_contigs)]
 
         # p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
@@ -411,7 +432,8 @@ class PloidyModel(GeneralizedContinuousModel):
             #                       pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]], axis=1)))
             #         for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
             return tt.stack([tt.sum(tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
-                                    tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+                                    # tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+                                    tt.sum(_hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
                                            pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]], axis=1)))
                              for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
@@ -467,8 +489,8 @@ class PloidyEmissionBasicSampler:
             print('sample_{0}:'.format(s), np.argmax(q_ploidy_jl, axis=1))
         # print("log_q_ploidy_sjl")
         # print(self.ploidy_workspace.log_q_ploidy_sjl.get_value(borrow=True))
-        # print("pi_i_sk")
-        # print(pi_i_sk)
+        print("pi_i_sk")
+        print(pi_i_sk)
         print("d_s")
         print(d_s)
         print("b_j_norm")

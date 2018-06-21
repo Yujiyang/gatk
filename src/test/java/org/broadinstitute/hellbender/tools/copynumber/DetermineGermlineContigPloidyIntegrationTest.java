@@ -34,6 +34,10 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     private static final String SIMULATED_DATA_DIR = toolsTestDir + "copynumber/gcnv-sim-data/";
     private static final File PLOIDY_STATE_PRIORS_FILE =
             new File(SIMULATED_DATA_DIR, "ploidy_state_priors.tsv");
+    private static final List<File> SIMULATED_COUNT_FILES;
+//    private static final File OUTPUT_DIR = createTempDir("test-ploidy");
+    private static final File OUTPUT_DIR = new File("/home/slee/working/gatk/test_files");
+
     private static final List<File> COUNT_FILES = Arrays.asList(
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/cases/10C110552.cram.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/cases/10C112547.cram.counts.hdf5"),
@@ -96,7 +100,6 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540325.cram.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540328.cram.counts.hdf5")
     );
-    private static final File OUTPUT_DIR = createTempDir("test-ploidy");
 
     private static final class PloidyProfile {
         private final LinkedHashMap<String, Integer> contigToPloidyMap;
@@ -125,7 +128,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
 
     private static final class SimulatedData {
         private static final int RANDOM_SEED = 1;
-        private static final double MAPPING_ERROR = 0.01;
+        private static final double ERROR_RATE = 0.01;
 
         private final List<PloidyProfile> ploidyProfiles;
         private final List<SimpleCountCollection> countCollections;
@@ -153,10 +156,10 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                     .collect(Collectors.toList());
         }
 
-        private List<File> writeCountFiles() {
+        private List<File> writeCountFiles(final File outputDir) {
             final List<File> countFiles = new ArrayList<>(countCollections.size());
             countCollections.forEach(c -> {
-                final File outputFile = createTempFile(c.getMetadata().getSampleName(), ".tsv");
+                final File outputFile = new File(outputDir, c.getMetadata().getSampleName() + ".tsv");
                 c.write(outputFile);
                 countFiles.add(outputFile);
             });
@@ -172,7 +175,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                     .map(c -> IntStream.range(1, numIntervalsPerContig + 1).boxed()
                             .map(i -> new SimpleCount(
                                     new SimpleInterval(c, i, i),
-                                    (int) rng.nextPoisson(Math.max(ploidyProfile.getPloidy(c), MAPPING_ERROR) * averageDepth)))
+                                    (int) rng.nextPoisson(Math.max(ploidyProfile.getPloidy(c), ERROR_RATE) * averageDepth)))
                             .collect(Collectors.toList()))
                     .flatMap(List::stream)
                     .collect(Collectors.toList());
@@ -180,26 +183,15 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         }
     }
 
-    @Test(groups = {"python"})
-    public void testCohort() {
+    static {
         final List<String> contigs = Arrays.asList("1", "2", "X", "Y");
         final SimulatedData simulatedData = new SimulatedData(
                 Arrays.asList(
                         new PloidyProfile(contigs, Arrays.asList(3, 2, 1, 1)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 1, 1)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 1, 1)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 1, 1)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 1, 1)),
                         new PloidyProfile(contigs, Arrays.asList(2, 3, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 1, 1)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 0)),
-                        new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 0)),
+                        new PloidyProfile(contigs, Arrays.asList(2, 2, 1, 1)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 2, 0)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 1, 2)),
                         new PloidyProfile(contigs, Arrays.asList(2, 2, 1, 0)),
@@ -208,35 +200,37 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                 ),
                 100.,
                 10000);
-        final List<File> countFiles = simulatedData.writeCountFiles();
-
-        final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        countFiles.forEach(argsBuilder::addInput);
-        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
-//                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
-                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
-                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
-                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
-                .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
-        runCommandLine(argsBuilder);
+        SIMULATED_COUNT_FILES = simulatedData.writeCountFiles(OUTPUT_DIR);
     }
 
     @Test(groups = {"python"})
-    public void testAneuploidyCohort() {
+    public void testCohort() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        COUNT_FILES.forEach(argsBuilder::addInput);
-        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors.tsv"))
-                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
-                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort")
-                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
+        SIMULATED_COUNT_FILES.forEach(argsBuilder::addInput);
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
+                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
+                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
+                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "500")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
+
+//    @Test(groups = {"python"})
+//    public void testAneuploidyCohort() {
+//        final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
+//        COUNT_FILES.forEach(argsBuilder::addInput);
+//        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors.tsv"))
+//                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
+//                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort")
+//                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
+//                .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
+//        runCommandLine(argsBuilder);
+//    }
 
     @Test(groups = {"python"}, expectedExceptions = UserException.BadInput.class)
     public void testCohortWithoutContigPloidyPriors() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        COUNT_FILES.forEach(argsBuilder::addInput);
+        SIMULATED_COUNT_FILES.forEach(argsBuilder::addInput);
         argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
@@ -246,7 +240,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     @Test(groups = {"python"}, expectedExceptions = UserException.BadInput.class)
     public void testCohortWithSingleSample() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        argsBuilder.addInput(COUNT_FILES.get(0));
+        argsBuilder.addInput(SIMULATED_COUNT_FILES.get(0));
         argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
@@ -256,7 +250,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     @Test(groups = {"python"}, expectedExceptions = IllegalArgumentException.class)
     public void testCohortDuplicateFiles() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        COUNT_FILES.forEach(argsBuilder::addInput);
+        SIMULATED_COUNT_FILES.forEach(argsBuilder::addInput);
         argsBuilder.addInput(COUNT_FILES.get(0));  //duplicate
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
@@ -271,11 +265,12 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     @Test(groups = {"python"}, dependsOnMethods = "testCohort")
     public void testCase() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        COUNT_FILES.subList(0, 5).forEach(argsBuilder::addInput);
+        SIMULATED_COUNT_FILES.subList(0, 5).forEach(argsBuilder::addInput);
         argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-case")
                 .addArgument(CopyNumberStandardArgument.MODEL_LONG_NAME,
                         new File(OUTPUT_DIR, "test-ploidy-cohort-model").getAbsolutePath())
+                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "500")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -283,7 +278,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
     @Test(groups = {"python"}, dependsOnMethods = "testCohort", expectedExceptions = UserException.BadInput.class)
     public void testCaseWithContigPloidyPrior() {
         final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-        COUNT_FILES.subList(0, 5).forEach(argsBuilder::addInput);
+        SIMULATED_COUNT_FILES.subList(0, 5).forEach(argsBuilder::addInput);
         argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-case")
