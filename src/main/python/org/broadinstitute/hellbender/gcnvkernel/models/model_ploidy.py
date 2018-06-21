@@ -499,6 +499,7 @@ class PloidyEmissionBasicSampler:
         counts_m = self.ploidy_workspace.counts_m
         hist_sjm_full = self.ploidy_workspace.hist_sjm_full
         hist_sjm = self.ploidy_workspace.hist_sjm_full[:, :, counts_m]
+        hist_sj_cutoff = self.ploidy_workspace.hist_cutoff_sj
         for s in range(self.ploidy_workspace.num_samples):
             fig, ax = plt.subplots()
             for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples):
@@ -506,7 +507,8 @@ class PloidyEmissionBasicSampler:
                     # k = np.argmax(pi_i_sk[i][s])
                     j = self.ploidy_workspace.contig_to_index_map[contig]
                     plt.semilogy(hist_sjm_full[s, j], color='b', lw=0.5)
-                    plt.semilogy(counts_m, hist_sjm[s, j], color='r', lw=3)
+                    plt.semilogy(counts_m[hist_sjm[s, j] > hist_sj_cutoff[s, j]],
+                                 hist_sjm[s, j, hist_sjm[s, j] > hist_sj_cutoff[s, j]], color='r', lw=3)
                     # plt.semilogy(counts_m, hist_mu_j_skm[j][s, k], color='g', lw=3)
                     y_max = 2 * np.max(hist_sjm_full[s, j])
                     ax.set_xlim([0, hist_sjm_full.shape[2]])
