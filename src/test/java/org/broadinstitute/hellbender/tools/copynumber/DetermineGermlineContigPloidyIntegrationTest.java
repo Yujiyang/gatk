@@ -215,17 +215,17 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         runCommandLine(argsBuilder);
     }
 
-//    @Test(groups = {"python"})
-//    public void testAneuploidyCohort() {
-//        final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
-//        COUNT_FILES.forEach(argsBuilder::addInput);
-//        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors.tsv"))
-//                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
-//                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort")
-//                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
-//                .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
-//        runCommandLine(argsBuilder);
-//    }
+    @Test(groups = {"python"})
+    public void testAneuploidyCohort() {
+        final ArgumentsBuilder argsBuilder = new ArgumentsBuilder();
+        COUNT_FILES.forEach(argsBuilder::addInput);
+        argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors.tsv"))
+                .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
+                .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort")
+                .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "250")
+                .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
+        runCommandLine(argsBuilder);
+    }
 
     @Test(groups = {"python"}, expectedExceptions = UserException.BadInput.class)
     public void testCohortWithoutContigPloidyPriors() {

@@ -319,9 +319,9 @@ class PloidyModel(GeneralizedContinuousModel):
         contig_bias_lower_bound = ploidy_config.contig_bias_lower_bound
         contig_bias_upper_bound = ploidy_config.contig_bias_upper_bound
         contig_bias_scale = ploidy_config.contig_bias_scale
-        # mosaicism_bias_lower_bound = ploidy_config.mosaicism_bias_lower_bound
-        # mosaicism_bias_upper_bound = ploidy_config.mosaicism_bias_upper_bound
-        # mosaicism_bias_scale = ploidy_config.mosaicism_bias_scale
+        mosaicism_bias_lower_bound = ploidy_config.mosaicism_bias_lower_bound
+        mosaicism_bias_upper_bound = ploidy_config.mosaicism_bias_upper_bound
+        mosaicism_bias_scale = ploidy_config.mosaicism_bias_scale
         contig_tuples = ploidy_workspace.contig_tuples
         num_samples = ploidy_workspace.num_samples
         num_contigs = ploidy_workspace.num_contigs
@@ -353,12 +353,12 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_global(b_j)
         b_j_norm = Deterministic('b_j_norm', var=b_j / tt.mean(b_j))
 
-        # f_js = Bound(Normal,
-        #              lower=mosaicism_bias_lower_bound,
-        #              upper=mosaicism_bias_upper_bound)('f_js',
-        #                                                sd=mosaicism_bias_scale,
-        #                                                shape=(num_contigs, num_samples))
-        # register_as_sample_specific(f_js, sample_axis=1)
+        f_js = Bound(Normal,
+                     lower=mosaicism_bias_lower_bound,
+                     upper=mosaicism_bias_upper_bound)('f_js',
+                                                       sd=mosaicism_bias_scale,
+                                                       shape=(num_contigs, num_samples))
+        register_as_sample_specific(f_js, sample_axis=1)
 
         pi_i_sk = []
         for i, contig_tuple in enumerate(contig_tuples):
@@ -379,9 +379,9 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_global(error_rate_j)
 
         mu_j_sk = [d_s.dimshuffle(0, 'x') * b_j_norm[j] * \
-                   # (tt.maximum(ploidy_j_k[j][np.newaxis, :] + f_js[j].dimshuffle(0, 'x') * (ploidy_j_k[j][np.newaxis, :] > 0),
-                   #             e_js[j].dimshuffle(0, 'x')))
-                   tt.maximum(ploidy_j_k[j][np.newaxis, :], error_rate_j[j])
+                   (tt.maximum(ploidy_j_k[j][np.newaxis, :] + f_js[j].dimshuffle(0, 'x') * (ploidy_j_k[j][np.newaxis, :] > 0),
+                               error_rate_j[j]))
+                   # tt.maximum(ploidy_j_k[j][np.newaxis, :], error_rate_j[j])
                    for j in range(num_contigs)]
 
         psi_js = Exponential(name='psi_js',
