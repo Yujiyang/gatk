@@ -83,7 +83,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             fullName = MOSAICISM_BIAS_LOWER_BOUND_LONG_NAME,
             optional = true
     )
-    private double mosaicismBiasLowerBound = -0.9;
+    private double mosaicismBiasLowerBound = -0.5;
 
     @Argument(
             doc = "Upper bound of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
@@ -98,7 +98,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             minValue = 0.,
             optional = true
     )
-    private double mosaicismBiasScale = 0.01;
+    private double mosaicismBiasScale = 0.001;
 
     public List<String> generatePythonArguments(final DetermineGermlineContigPloidy.RunMode runMode) {
         if (runMode == DetermineGermlineContigPloidy.RunMode.COHORT) {

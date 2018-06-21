@@ -31,7 +31,7 @@ class PloidyModelConfig:
                  contig_bias_lower_bound: float = 0.8,
                  contig_bias_upper_bound: float = 1.2,
                  contig_bias_scale: float = 100.0,
-                 mosaicism_bias_lower_bound: float = -0.9,
+                 mosaicism_bias_lower_bound: float = -0.5,
                  mosaicism_bias_upper_bound: float = 0.5,
                  mosaicism_bias_scale: float = 0.01):
         """Initializer.
@@ -237,9 +237,6 @@ class PloidyWorkspace:
         # mask for count bins
         self.mask_sjm, self.counts_m = self._construct_mask(self.hist_sjm_full)
 
-        print(len(self.counts_m))
-        print(self.counts_m)
-
         average_ploidy = 2. # TODO
         self.d_s_testval = np.median(np.sum(self.hist_sjm_full * np.arange(self.hist_sjm_full.shape[2]), axis=-1) / np.sum(self.hist_sjm_full, axis=-1), axis=-1) / average_ploidy
 
@@ -328,8 +325,9 @@ class PloidyModel(GeneralizedContinuousModel):
         hist_sjm = ploidy_workspace.hist_sjm
         ploidy_state_priors_i_k = ploidy_workspace.ploidy_state_priors_i_k
         ploidy_j_k = ploidy_workspace.ploidy_j_k
-        d_s_testval = self.ploidy_workspace.d_s_testval
-        eps = self.ploidy_workspace.eps
+        is_ploidy_in_ploidy_state_j_kl = ploidy_workspace.is_ploidy_in_ploidy_state_j_kl
+        d_s_testval = ploidy_workspace.d_s_testval
+        eps = ploidy_workspace.eps
 
         register_as_global = self.register_as_global
         register_as_sample_specific = self.register_as_sample_specific
@@ -412,12 +410,27 @@ class PloidyModel(GeneralizedContinuousModel):
             #                tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
             #                       pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]], axis=1)))
             #         for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
-            return [tt.sum(tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
-                           tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-                                  pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]], axis=1)))
-                           for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
+            return tt.stack([tt.sum(tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
+                                    tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * _hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+                                           pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]], axis=1)))
+                             for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
         DensityDist(name='hist_sjm', logp=_logp_hist, observed=hist_sjm)
+
+        # logp_j_sk = [tt.log(ploidy_state_priors_i_k[i][np.newaxis, :] + eps) + \
+        #              tt.sum(mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+        #                     (tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]]), axis=-1)
+        #              for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]
+        #
+        # pm.Deterministic(name='log_ploidy_emission_sjl',
+        #                  var=tt.stack([
+        #                      pm.logsumexp(logp_j_sk[j][:, :, np.newaxis] + tt.log(is_ploidy_in_ploidy_state_j_kl[j][np.newaxis, :, :] + 1E-100), axis=1)
+        #                      for j in range(num_contigs)]).dimshuffle(1, 0, 3))
+
+        pm.Deterministic(name='log_ploidy_emission_sjl',
+                         var=tt.stack([
+                             tt.log(tt.dot(pi_i_sk[i], is_ploidy_in_ploidy_state_j_kl[contig_to_index_map[contig]]) + eps)
+                             for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]).dimshuffle(1, 0, 2))
 
 
 class PloidyEmissionBasicSampler:
@@ -452,6 +465,8 @@ class PloidyEmissionBasicSampler:
         q_ploidy_sjl = np.exp(self.ploidy_workspace.log_q_ploidy_sjl.get_value(borrow=True))
         for s, q_ploidy_jl in enumerate(q_ploidy_sjl):
             print('sample_{0}:'.format(s), np.argmax(q_ploidy_jl, axis=1))
+        # print("log_q_ploidy_sjl")
+        # print(self.ploidy_workspace.log_q_ploidy_sjl.get_value(borrow=True))
         # print("pi_i_sk")
         # print(pi_i_sk)
         print("d_s")
@@ -489,10 +504,8 @@ class PloidyEmissionBasicSampler:
         pi_i_sk = [commons.stochastic_node_mean_symbolic(
             approx, self.ploidy_model['pi_%d_sk' % i], size=self.samples_per_round)
             for i in range(self.ploidy_workspace.num_contig_tuples)]
-        log_ploidy_emission_sjl = tt.stack([
-            tt.log(tt.dot(pi_i_sk[i], self.ploidy_workspace.is_ploidy_in_ploidy_state_j_kl[self.ploidy_workspace.contig_to_index_map[contig]]) + self.ploidy_workspace.eps)
-            for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples)
-            for contig in contig_tuple]).dimshuffle(1, 0, 2)
+        log_ploidy_emission_sjl = commons.stochastic_node_mean_symbolic(
+            approx, self.ploidy_model['log_ploidy_emission_sjl'], size=self.samples_per_round)
         d_s = commons.stochastic_node_mean_symbolic(
             approx, self.ploidy_model['d_s'], size=self.samples_per_round)
         b_j_norm = commons.stochastic_node_mean_symbolic(
@@ -512,10 +525,10 @@ class PloidyBasicCaller:
                  ploidy_workspace: PloidyWorkspace):
         self.ploidy_workspace = ploidy_workspace
         self.inference_params = inference_params
-        self._update_log_q_ploidy_sjl_theano_func = self._update_log_q_ploidy_sjl_theano_func()
+        self._update_log_q_ploidy_sjl_theano_func = self._get_update_log_q_ploidy_sjl_theano_func()
 
     @th.configparser.change_flags(compute_test_value="off")
-    def _update_log_q_ploidy_sjl_theano_func(self) -> th.compile.function_module.Function:
+    def _get_update_log_q_ploidy_sjl_theano_func(self) -> th.compile.function_module.Function:
         # new_log_q_ploidy_sjl = self.ploidy_workspace.log_p_ploidy_jl.dimshuffle('x', 0, 1) + self.ploidy_workspace.log_ploidy_emission_sjl
         # new_log_q_ploidy_sjl -= pm.logsumexp(new_log_q_ploidy_sjl, axis=2)
         new_log_q_ploidy_sjl = self.ploidy_workspace.log_ploidy_emission_sjl - pm.logsumexp(self.ploidy_workspace.log_ploidy_emission_sjl, axis=2)

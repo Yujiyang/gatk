@@ -16,8 +16,8 @@ public final class GermlineContigPloidyHybridADVIArgumentCollection extends Hybr
         defaultValue.put(HybridADVIArgument.LOG_EMISSION_SAMPLES_PER_ROUND, 500);
         defaultValue.put(HybridADVIArgument.LOG_EMISSION_SAMPLING_MEDIAN_REL_ERROR, 0.01);
         defaultValue.put(HybridADVIArgument.LOG_EMISSION_SAMPLING_ROUNDS, 100);
-        defaultValue.put(HybridADVIArgument.MAX_ADVI_ITER_FIRST_EPOCH, 10000);
-        defaultValue.put(HybridADVIArgument.MAX_ADVI_ITER_SUBSEQUENT_EPOCHS, 10000);
+        defaultValue.put(HybridADVIArgument.MAX_ADVI_ITER_FIRST_EPOCH, 1000);
+        defaultValue.put(HybridADVIArgument.MAX_ADVI_ITER_SUBSEQUENT_EPOCHS, 1000);
         defaultValue.put(HybridADVIArgument.MIN_TRAINING_EPOCHS, 1);
         defaultValue.put(HybridADVIArgument.MAX_TRAINING_EPOCHS, 10);
         defaultValue.put(HybridADVIArgument.INITIAL_TEMPERATURE, 10.0);
