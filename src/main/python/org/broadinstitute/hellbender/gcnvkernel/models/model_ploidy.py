@@ -398,16 +398,17 @@ class PloidyModel(GeneralizedContinuousModel):
                 alltrue = pm_dist_math.alltrue_scalar
             return tt.switch(alltrue(conditions), logp, 0)
 
-        def negative_binomial_logp(mu, alpha, value):
+        def negative_binomial_logp(mu, alpha, value, mask):
             return bound(pm_dist_math.binomln(value + alpha - 1, value)
                                       + pm_dist_math.logpow(mu / (mu + alpha), value)
                                       + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
-                                      mu > 0, value >= 10, alpha > 0)
+                                      mu > 0, value > 0, alpha > 0, mask)
 
 
         logp_j_skm = [negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
                                              alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
-                                             value=counts_m[np.newaxis, np.newaxis, :])
+                                             value=counts_m[np.newaxis, np.newaxis, :],
+                                             mask=hist_sjm[:, j, np.newaxis, :] > 10)
                       for j in range(num_contigs)]
 
         # p_j_skm = [tt.exp(NegativeBinomial.dist(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
