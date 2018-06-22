@@ -107,7 +107,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             minValue = 0.,
             optional = true
     )
-    private double psiScale = 0.0001;
+    private double psiScale = 0.001;
 
 
     public List<String> generatePythonArguments(final DetermineGermlineContigPloidy.RunMode runMode) {
