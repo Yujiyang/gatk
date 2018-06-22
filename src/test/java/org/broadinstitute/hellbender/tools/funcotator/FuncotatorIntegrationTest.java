@@ -14,6 +14,7 @@ import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.copynumber.utils.annotatedinterval.AnnotatedIntervalCollection;
 import org.broadinstitute.hellbender.tools.funcotator.dataSources.gencode.GencodeFuncotation;
 import org.broadinstitute.hellbender.tools.funcotator.dataSources.xsv.SimpleKeyXsvFuncotationFactory;
+import org.broadinstitute.hellbender.tools.funcotator.mafOutput.CustomMafFuncotationCreator;
 import org.broadinstitute.hellbender.tools.funcotator.mafOutput.MafOutputRenderer;
 import org.broadinstitute.hellbender.tools.funcotator.mafOutput.MafOutputRendererConstants;
 import org.broadinstitute.hellbender.tools.funcotator.vcfOutput.VcfOutputRenderer;
@@ -1003,7 +1004,10 @@ public class FuncotatorIntegrationTest extends CommandLineProgramTest {
 
         final AnnotatedIntervalCollection maf = AnnotatedIntervalCollection.create(outputFile.toPath(), null);
         Assert.assertEquals(maf.getRecords().size(),  0);
-        // TODO: Check for the custom Maf fields
+
+        // Double-check that the custom MAF fields are present.
+        Assert.assertTrue(CustomMafFuncotationCreator.COUNT_FIELD_NAMES.stream()
+                .allMatch(f -> maf.getAnnotations().contains(f)));
     }
 }
 
