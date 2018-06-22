@@ -26,9 +26,10 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
     public static final String MOSAICISM_BIAS_LOWER_BOUND_LONG_NAME = "mosaicism-bias-lower-bound";
     public static final String MOSAICISM_BIAS_UPPER_BOUND_LONG_NAME = "mosaicism-bias-upper-bound";
     public static final String MOSAICISM_BIAS_SCALE_LONG_NAME = "mosaicism-bias-scale";
+    public static final String PSI_SCALE_LONG_NAME = "psi-scale";
 
     @Argument(
-            doc = "Scaling factor for the concentration parameters of the per-contig-set Dirichlet prior on ploidy states.  " +
+            doc = "Scale factor for the concentration parameters of the per-contig-set Dirichlet prior on ploidy states.  " +
                     "The relative probabilities given by the ploidy-state priors are normalized and multiplied by this factor " +
                     "to yield the concentration parameters.",
             fullName = PLOIDY_CONCENTRATION_SCALE_LONG_NAME,
@@ -59,7 +60,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             minValue = 0.,
             optional = true
     )
-    private double contigBiasLowerBound = 0.8;
+    private double contigBiasLowerBound = 0.1;
 
     @Argument(
             doc = "Upper bound of the Gamma prior on the per-contig bias.",
@@ -67,16 +68,16 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             minValue = 0.,
             optional = true
     )
-    private double contigBiasUpperBound = 1.2;
+    private double contigBiasUpperBound = 2.;
 
     @Argument(
-            doc = "Scaling factor for the Gamma prior on the per-contig bias.  " +
+            doc = "Scale factor for the Gamma prior on the per-contig bias.  " +
                     "Both alpha and beta hyperparameters for the Gamma prior will be set to this factor.",
             fullName = CONTIG_BIAS_SCALE_LONG_NAME,
             minValue = 0.,
             optional = true
     )
-    private double contigBiasScale = 100.;
+    private double contigBiasScale = 10.;
 
     @Argument(
             doc = "Lower bound of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
@@ -100,6 +101,15 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
     )
     private double mosaicismBiasScale = 0.001;
 
+    @Argument(
+            doc = "Inverse mean of the exponential prior on the per-sample unexplained variance.",
+            fullName = PSI_SCALE_LONG_NAME,
+            minValue = 0.,
+            optional = true
+    )
+    private double psiScale = 0.0001;
+
+
     public List<String> generatePythonArguments(final DetermineGermlineContigPloidy.RunMode runMode) {
         if (runMode == DetermineGermlineContigPloidy.RunMode.COHORT) {
             return Arrays.asList(
@@ -111,7 +121,8 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
                     String.format("--contig_bias_scale=%e", contigBiasScale),
                     String.format("--mosaicism_bias_lower_bound=%e", mosaicismBiasLowerBound),
                     String.format("--mosaicism_bias_upper_bound=%e", mosaicismBiasUpperBound),
-                    String.format("--mosaicism_bias_scale=%e", mosaicismBiasScale));
+                    String.format("--mosaicism_bias_scale=%e", mosaicismBiasScale),
+                    String.format("--psi_scale=%e", psiScale));
         }
         return Collections.emptyList();
     }
@@ -135,6 +146,8 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
                 "Upper bound of the per-sample-and-contig mosaicism bias must be finite.");
         ParamUtils.isPositive(mosaicismBiasScale,
                 "Scale of the per-sample-and-contig mosaicism bias must be positive.");
+        ParamUtils.isPositive(psiScale,
+                "Scale of the per-sample unexplained variance must be positive.");
         Utils.validateArg(contigBiasLowerBound < contigBiasUpperBound,
                 "Lower bound of the per-contig bias must be less than the upper bound.");
         Utils.validateArg(mosaicismBiasLowerBound < mosaicismBiasUpperBound,
