@@ -238,11 +238,12 @@ class PloidyWorkspace:
         self.counts_m = np.arange(self.num_counts, dtype=types.med_uint)
 
         # mask for count bins
-        mask_percentile = 40
-        hist_sjm_masked = np.ma.masked_where(self.hist_sjm_full == 0, self.hist_sjm_full)
-        hist_sjm_masked = np.ma.filled(hist_sjm_masked.astype(float), np.nan)
-        hist_cutoff_sj = np.nanpercentile(hist_sjm_masked, mask_percentile, axis=-1)
-        self.hist_sjm_mask = self.hist_sjm_full > hist_cutoff_sj[:, :, np.newaxis]
+        # mask_percentile = 40
+        # hist_sjm_masked = np.ma.masked_where(self.hist_sjm_full == 0, self.hist_sjm_full)
+        # hist_sjm_masked = np.ma.filled(hist_sjm_masked.astype(float), np.nan)
+        # hist_cutoff_sj = np.nanpercentile(hist_sjm_masked, mask_percentile, axis=-1)
+        # self.hist_sjm_mask = self.hist_sjm_full > hist_cutoff_sj[:, :, np.newaxis]
+        self.hist_sjm_mask = self._construct_mask(self.hist_sjm_full)
 
         for s in range(self.num_samples):
             fig, ax = plt.subplots()
@@ -293,6 +294,35 @@ class PloidyWorkspace:
     @staticmethod
     def _get_contig_set_from_interval_list(interval_list: List[Interval]) -> Set[str]:
         return {interval.contig for interval in interval_list}
+
+    @staticmethod
+    def _construct_mask(hist_sjm):
+        count_states = np.arange(0, hist_sjm.shape[2])
+        mode_sj = np.argmax(hist_sjm * (count_states >= 10), axis=2)
+        mask_sjm = np.full(np.shape(hist_sjm), False)
+        for s in range(np.shape(hist_sjm)[0]):
+            for j in range(np.shape(hist_sjm)[1]):
+                min_sj = np.argmin(hist_sjm[s, j, :mode_sj[s, j] + 1])
+                if mode_sj[s, j] <= 10:
+                    mode_sj[s, j] = 0
+                    cutoff = 0.
+                else:
+                    cutoff = 0.05
+                for m in range(mode_sj[s, j], np.shape(hist_sjm)[2]):
+                    if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
+                        if hist_sjm[s, j, m] > 0:
+                            mask_sjm[s, j, m] = True
+                    else:
+                        break
+                for m in range(mode_sj[s, j], min_sj, -1):
+                    if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
+                        if hist_sjm[s, j, m] > 0:
+                            mask_sjm[s, j, m] = True
+                    else:
+                        break
+            mask_sjm[:, :, 0] = False
+
+        return mask_sjm
 
 
 class PloidyModel(GeneralizedContinuousModel):
