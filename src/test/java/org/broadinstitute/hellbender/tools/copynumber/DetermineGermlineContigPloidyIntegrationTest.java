@@ -112,7 +112,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
 //            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00118.counts.hdf5"),
 //            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00119.counts.hdf5"),
 //            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00137.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00138.counts.hdf5")//,
+//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00138.counts.hdf5"),
 //            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00139.counts.hdf5"),
 //            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00140.counts.hdf5"),
 //            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00255.counts.hdf5"),

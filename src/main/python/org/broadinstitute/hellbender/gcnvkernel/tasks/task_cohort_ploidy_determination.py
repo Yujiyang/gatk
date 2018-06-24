@@ -3,6 +3,7 @@ import numpy as np
 import pymc3 as pm
 from typing import Callable
 import matplotlib.pyplot as plt
+from scipy.stats import nbinom
 
 from .inference_task_base import Sampler, Caller, CallerUpdateSummary, \
     HybridInferenceTask, HybridInferenceParameters
@@ -109,6 +110,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
         self.ploidy_workspace = ploidy_workspace
 
     def disengage(self):
+        print("Sampling...")
         num_samples = 100
         trace = self.continuous_model_approx.sample(num_samples)
         pi_i_sk = [np.mean(trace['pi_%d_sk' % i], axis=0)
@@ -118,6 +120,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
         mu_j_sk = [np.mean(trace['mu_%d_sk' % j], axis=0)
                    for j in range(self.ploidy_workspace.num_contigs)]
         alpha_js = np.mean(trace['alpha_js'], axis=0)
+        print("Sampling done.")
 
         print("d_s")
         print(d_s)
@@ -136,8 +139,9 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                     t_j[j] = np.mean(np.repeat(counts_m_masked[1:], self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked[1:]]))
                     k = np.argmax(pi_i_sk[i][s])
                     print(mu_j_sk[j][s, k], alpha_js[j, s])
-                    pdf = np.exp(pm.NegativeBinomial.dist(mu=mu_j_sk[j][s, k],
-                                                          alpha=alpha_js[j, s]).logp(self.ploidy_workspace.counts_m).eval())
+                    mu = mu_j_sk[j][s, k]
+                    alpha = alpha_js[j, s]
+                    pdf = nbinom.pmf(k=self.ploidy_workspace.counts_m, n=alpha, p=alpha / (mu + alpha))
                     plt.semilogy(self.ploidy_workspace.hist_sjm_full[s, j] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]), color='k', lw=0.5, alpha=0.2)
                     plt.semilogy(counts_m_masked, self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]),
                                  c='b' if j < self.ploidy_workspace.num_contigs - 2 else 'r', lw=1, alpha=0.5)
