@@ -425,6 +425,18 @@ class PloidyModel(GeneralizedContinuousModel):
                 alltrue = pm_dist_math.alltrue_scalar
             return tt.switch(alltrue(conditions), logp, 0)
 
+        # def negative_binomial_logp(mu, alpha, value, mask=True):
+        #     return bound(pm_dist_math.factln(value + alpha - 1) - pm_dist_math.factln(alpha - 1)
+        #                  + pm_dist_math.logpow(mu / (mu + alpha), value)
+        #                  + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
+        #                  mu > 0, value > 0, alpha > 0, mask)   # mask out value = 0
+        #
+        # logp_j_skm = [negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+        #                                      alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
+        #                                      value=counts_m[np.newaxis, np.newaxis, :],
+        #                                      mask=hist_sjm_mask[:, j, np.newaxis, :])
+        #               for j in range(num_contigs)]
+
         def negative_binomial_logp(mu, alpha, value, mask=True):
             return bound(pm_dist_math.factln(value + alpha - 1) - pm_dist_math.factln(alpha - 1) - pm_dist_math.factln(value)
                                       + pm_dist_math.logpow(mu / (mu + alpha), value)
@@ -435,12 +447,6 @@ class PloidyModel(GeneralizedContinuousModel):
             log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu >= 0, value > 0, mask)
             # Return zero when mu and value are both zero
             return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)
-
-        # logp_j_skm = [negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-        #                                      alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
-        #                                      value=counts_m[np.newaxis, np.newaxis, :],
-        #                                      mask=hist_sjm_mask[:, j, np.newaxis, :])
-        #               for j in range(num_contigs)]
 
         num_occurrences_tot_sj = np.sum(self.ploidy_workspace.hist_sjm_full, axis=-1)
         p_j_skm = [tt.exp(negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,

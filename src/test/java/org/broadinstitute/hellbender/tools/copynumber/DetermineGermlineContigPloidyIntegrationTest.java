@@ -84,22 +84,22 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540159.cram.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540160.cram.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540172.cram.counts.hdf5"),
-            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540173.cram.counts.hdf5")//,
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540177.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540185.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540189.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540194.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540206.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540235.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540251.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540264.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540273.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540275.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540285.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540288.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540306.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540325.cram.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540328.cram.counts.hdf5")
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540173.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540177.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540185.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540189.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540194.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540206.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540235.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540251.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540264.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540273.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540275.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540285.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540288.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540306.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540325.cram.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/aneuploidy-samples/panel/8007540328.cram.counts.hdf5")
     );
 
     private static final List<File> SFARI_COUNT_FILES = Arrays.asList(
@@ -257,6 +257,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "250")
+                .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.01")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -269,6 +270,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort-full")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "250")
+                .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.01")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
