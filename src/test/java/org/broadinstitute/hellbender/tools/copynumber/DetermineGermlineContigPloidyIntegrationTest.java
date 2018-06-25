@@ -107,32 +107,32 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
             new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00090.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00091.counts.hdf5"),
             new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00092.counts.hdf5"),
-            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00115.counts.hdf5")//,
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00117.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00118.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00119.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00137.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00138.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00139.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00140.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00255.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00256.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00259.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00314.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00318.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00320.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00469.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00472.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00473.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00517.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00519.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00520.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00521.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00534.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00535.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00536.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00537.counts.hdf5"),
-//            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00604.counts.hdf5")
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00115.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00117.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00118.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00119.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00137.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00138.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00139.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00140.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00255.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00256.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00259.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00314.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00318.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00320.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00469.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00472.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00473.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00517.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00519.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00520.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00521.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00534.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00535.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00536.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00537.counts.hdf5"),
+            new File("/home/slee/working/gatk/test_files/sfari-samples/SSC00604.counts.hdf5")
     );
 
     private static final class PloidyProfile {
@@ -257,7 +257,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "250")
-                .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.001")
+                .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.01")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -270,7 +270,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort-full")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "250")
-                .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.001")
+                .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.01")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }

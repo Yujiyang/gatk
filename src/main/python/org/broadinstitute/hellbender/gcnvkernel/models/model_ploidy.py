@@ -303,11 +303,12 @@ class PloidyWorkspace:
         for s in range(np.shape(hist_sjm)[0]):
             for j in range(np.shape(hist_sjm)[1]):
                 min_sj = np.argmin(hist_sjm[s, j, :mode_sj[s, j] + 1])
-                if mode_sj[s, j] <= 10:
-                    mode_sj[s, j] = 0
-                    cutoff = 0.
-                else:
-                    cutoff = 0.05
+                cutoff = 0.05
+                # if mode_sj[s, j] <= 10:
+                #     mode_sj[s, j] = 0
+                #     cutoff = 0.
+                # else:
+                #     cutoff = 0.05
                 for m in range(mode_sj[s, j], np.shape(hist_sjm)[2]):
                     if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
                         if hist_sjm[s, j, m] > 0:
@@ -398,16 +399,16 @@ class PloidyModel(GeneralizedContinuousModel):
             else:
                 pi_i_sk.append(Deterministic('pi_%d_sk' % i, var=tt.ones((num_samples, 1))))
 
-        error_rate_j = Uniform('error_rate_j',
+        error_rate_js = Uniform('error_rate_js',
                                lower=0.,
                                upper=error_rate_upper_bound,
-                               shape=num_contigs)
-        register_as_global(error_rate_j)
+                               shape=(num_contigs, num_samples))
+        register_as_sample_specific(error_rate_js, sample_axis=1)
 
         mu_j_sk = [pm.Deterministic('mu_%d_sk' % j,
                                     var=d_s.dimshuffle(0, 'x') * b_j_norm[j] * \
                                         (tt.maximum(ploidy_j_k[j][np.newaxis, :] + f_js[j].dimshuffle(0, 'x') * (ploidy_j_k[j][np.newaxis, :] > 0),
-                                                    error_rate_j[j])))
+                                                    error_rate_js[j][:, np.newaxis])))
                    # tt.maximum(ploidy_j_k[j][np.newaxis, :], error_rate_j[j])
                    for j in range(num_contigs)]
 
@@ -441,10 +442,10 @@ class PloidyModel(GeneralizedContinuousModel):
             return bound(pm_dist_math.factln(value + alpha - 1) - pm_dist_math.factln(alpha - 1) - pm_dist_math.factln(value)
                                       + pm_dist_math.logpow(mu / (mu + alpha), value)
                                       + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
-                                      mu > 0, value >= 0, alpha > 0, mask)   # mask out value = 0
+                                      mu > 0, value >= 0, alpha > 0, mask)
 
         def poisson_logp(mu, value, mask=True):
-            log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu >= 0, value > 0, mask)
+            log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu >= 0, value >= 0, mask)
             # Return zero when mu and value are both zero
             return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)
 

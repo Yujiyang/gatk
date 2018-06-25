@@ -151,7 +151,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                     plt.semilogy(self.ploidy_workspace.hist_sjm_full[s, j], color='k', lw=0.5, alpha=0.1)
                     plt.semilogy(counts_m_masked, self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked],
                                  c='b' if j < self.ploidy_workspace.num_contigs - 2 else 'r', lw=1, alpha=0.25)
-                    plt.semilogy(hist_j_skm[j][s, k], color='g')
+                    plt.semilogy(counts_m_masked, hist_j_skm[j][s, k][counts_m_masked], color='g')
                     ax.set_xlim([0, self.ploidy_workspace.num_counts])
                     # ax.set_ylim([1E-5, 1E-1])
             print(s, t_j / np.mean(t_j))
