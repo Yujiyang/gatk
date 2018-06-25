@@ -253,14 +253,14 @@ class PloidyWorkspace:
                     j = self.contig_to_index_map[contig]
                     counts_m_masked = self.counts_m[self.hist_sjm_mask[s, j]]
                     t_j[j] = np.mean(np.repeat(counts_m_masked[1:], self.hist_sjm_full[s, j, counts_m_masked[1:]]))
-                    # plt.semilogy(self.hist_sjm_full[s, j] / np.sum(self.hist_sjm_full[s, j]), color='k', lw=0.5, alpha=0.1)
-                    # plt.semilogy(counts_m_masked, self.hist_sjm_full[s, j, counts_m_masked] / np.sum(self.hist_sjm_full[s, j]),
-                    #              c='b' if j < self.num_contigs - 2 else 'r', lw=1, alpha=0.25)
-                    plt.semilogy(self.hist_sjm_full[s, j], color='k', lw=0.5, alpha=0.1)
-                    plt.semilogy(counts_m_masked, self.hist_sjm_full[s, j, counts_m_masked],
+                    plt.semilogy(self.hist_sjm_full[s, j] / np.sum(self.hist_sjm_full[s, j]), color='k', lw=0.5, alpha=0.1)
+                    plt.semilogy(counts_m_masked, self.hist_sjm_full[s, j, counts_m_masked] / np.sum(self.hist_sjm_full[s, j]),
                                  c='b' if j < self.num_contigs - 2 else 'r', lw=1, alpha=0.25)
+                    # plt.semilogy(self.hist_sjm_full[s, j], color='k', lw=0.5, alpha=0.1)
+                    # plt.semilogy(counts_m_masked, self.hist_sjm_full[s, j, counts_m_masked],
+                    #              c='b' if j < self.num_contigs - 2 else 'r', lw=1, alpha=0.25)
                     ax.set_xlim([0, self.num_counts])
-                    # ax.set_ylim([1E-5, 1E-1])
+                    ax.set_ylim([1E-5, 1E-1])
                     # ax.set_ylim([1, 2 * np.max(self.hist_sjm_full)])
 
             print(s, t_j / np.mean(t_j))
@@ -299,29 +299,30 @@ class PloidyWorkspace:
     def _construct_mask(hist_sjm):
         count_states = np.arange(0, hist_sjm.shape[2])
         mode_sj = np.argmax(hist_sjm * (count_states >= 5), axis=2)
-        mask_sjm = np.full(np.shape(hist_sjm), False)
-        for s in range(np.shape(hist_sjm)[0]):
-            for j in range(np.shape(hist_sjm)[1]):
-                min_sj = np.argmin(hist_sjm[s, j, :mode_sj[s, j] + 1])
-                cutoff = 0.05
-                # if mode_sj[s, j] <= 10:
-                #     mode_sj[s, j] = 0
-                #     cutoff = 0.
-                # else:
-                #     cutoff = 0.05
-                for m in range(mode_sj[s, j], np.shape(hist_sjm)[2]):
-                    if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
-                        if hist_sjm[s, j, m] > 0:
-                            mask_sjm[s, j, m] = True
-                    else:
-                        break
-                for m in range(mode_sj[s, j], min_sj, -1):
-                    if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
-                        if hist_sjm[s, j, m] > 0:
-                            mask_sjm[s, j, m] = True
-                    else:
-                        break
-            mask_sjm[:, :, 0] = False
+        # mask_sjm = np.full(np.shape(hist_sjm), False)
+        # for s in range(np.shape(hist_sjm)[0]):
+        #     for j in range(np.shape(hist_sjm)[1]):
+        #         min_sj = np.argmin(hist_sjm[s, j, :mode_sj[s, j] + 1])
+        #         if mode_sj[s, j] <= 10:
+        #             mode_sj[s, j] = 0
+        #             cutoff = 0.
+        #         else:
+        #             cutoff = 0.05
+        #         for m in range(mode_sj[s, j], np.shape(hist_sjm)[2]):
+        #             if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
+        #                 if hist_sjm[s, j, m] > 0:
+        #                     mask_sjm[s, j, m] = True
+        #             else:
+        #                 break
+        #         for m in range(mode_sj[s, j], min_sj, -1):
+        #             if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
+        #                 if hist_sjm[s, j, m] > 0:
+        #                     mask_sjm[s, j, m] = True
+        #             else:
+        #                 break
+
+        mask_sjm = np.full(np.shape(hist_sjm), True)
+        mask_sjm[:, :, 0] = False
 
         return mask_sjm
 
@@ -426,52 +427,52 @@ class PloidyModel(GeneralizedContinuousModel):
                 alltrue = pm_dist_math.alltrue_scalar
             return tt.switch(alltrue(conditions), logp, 0)
 
-        # def negative_binomial_logp(mu, alpha, value, mask=True):
-        #     return bound(pm_dist_math.factln(value + alpha - 1) - pm_dist_math.factln(alpha - 1)
-        #                  + pm_dist_math.logpow(mu / (mu + alpha), value)
-        #                  + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
-        #                  mu > 0, value > 0, alpha > 0, mask)   # mask out value = 0
-        #
-        # logp_j_skm = [negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-        #                                      alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
-        #                                      value=counts_m[np.newaxis, np.newaxis, :],
-        #                                      mask=hist_sjm_mask[:, j, np.newaxis, :])
-        #               for j in range(num_contigs)]
-
         def negative_binomial_logp(mu, alpha, value, mask=True):
-            return bound(pm_dist_math.factln(value + alpha - 1) - pm_dist_math.factln(alpha - 1) - pm_dist_math.factln(value)
-                                      + pm_dist_math.logpow(mu / (mu + alpha), value)
-                                      + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
-                                      mu > 0, value >= 0, alpha > 0, mask)
+            return bound(pm_dist_math.factln(value + alpha - 1) - pm_dist_math.factln(alpha - 1)
+                         + pm_dist_math.logpow(mu / (mu + alpha), value)
+                         + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
+                         mu > 0, value > 0, alpha > 0, mask)   # mask out value = 0
 
-        def poisson_logp(mu, value, mask=True):
-            log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu >= 0, value >= 0, mask)
-            # Return zero when mu and value are both zero
-            return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)
+        logp_j_skm = [negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+                                             alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
+                                             value=counts_m[np.newaxis, np.newaxis, :],
+                                             mask=hist_sjm_mask[:, j, np.newaxis, :])
+                      for j in range(num_contigs)]
 
-        num_occurrences_sj = np.sum(self.ploidy_workspace.hist_sjm_full * hist_sjm_mask, axis=-1)
-        p_j_skm = [tt.exp(negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
-                                                 alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
-                                                 value=counts_m[np.newaxis, np.newaxis, :],
-                                                 mask=hist_sjm_mask[:, j, np.newaxis, :]))
-                   for j in range(num_contigs)]
-        [pm.Deterministic('hist_%d_skm' % j,
-                          var=num_occurrences_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps)
-         for j in range(num_contigs)]
+        # def negative_binomial_logp(mu, alpha, value, mask=True):
+        #     return bound(pm_dist_math.factln(value + alpha - 1) - pm_dist_math.factln(alpha - 1) - pm_dist_math.factln(value)
+        #                               + pm_dist_math.logpow(mu / (mu + alpha), value)
+        #                               + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
+        #                               mu > 0, value >= 0, alpha > 0, mask)
+        #
+        # def poisson_logp(mu, value, mask=True):
+        #     log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu >= 0, value >= 0, mask)
+        #     # Return zero when mu and value are both zero
+        #     return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)
+        #
+        # num_occurrences_sj = np.sum(self.ploidy_workspace.hist_sjm_full * hist_sjm_mask, axis=-1)
+        # p_j_skm = [tt.exp(negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
+        #                                          alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
+        #                                          value=counts_m[np.newaxis, np.newaxis, :],
+        #                                          mask=hist_sjm_mask[:, j, np.newaxis, :]))
+        #            for j in range(num_contigs)]
+        # [pm.Deterministic('hist_%d_skm' % j,
+        #                   var=num_occurrences_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps)
+        #  for j in range(num_contigs)]
 
         def _logp_hist(_hist_sjm):
-            logp_hist_j_skm = [poisson_logp(mu=num_occurrences_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps,
-                                            value=_hist_sjm[:, j, :].dimshuffle(0, 'x', 1),
-                                            mask=hist_sjm_mask[:, j, np.newaxis, :])
-                               for j in range(num_contigs)]
-            return tt.stack([tt.sum(log_ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + \
-                                    tt.sum(hist_sjm_mask[:, contig_to_index_map[contig], np.newaxis, :] * \
-                                           pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]], axis=1)))
-                    for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
-            # return tt.stack([tt.sum(tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
-            #                         tt.sum(_hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
-            #                                pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]], axis=1)))
-            #                  for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
+            # logp_hist_j_skm = [poisson_logp(mu=num_occurrences_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps,
+            #                                 value=_hist_sjm[:, j, :].dimshuffle(0, 'x', 1),
+            #                                 mask=hist_sjm_mask[:, j, np.newaxis, :])
+            #                    for j in range(num_contigs)]
+            # return tt.stack([tt.sum(log_ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + \
+            #                         tt.sum(hist_sjm_mask[:, contig_to_index_map[contig], np.newaxis, :] * \
+            #                                pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]], axis=1)))
+            #         for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
+            return tt.stack([tt.sum(tt.log(ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + eps) + \
+                                    tt.sum(_hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
+                                           pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_j_skm[contig_to_index_map[contig]], axis=1)))
+                             for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
         DensityDist(name='hist_sjm', logp=_logp_hist, observed=hist_sjm)
 

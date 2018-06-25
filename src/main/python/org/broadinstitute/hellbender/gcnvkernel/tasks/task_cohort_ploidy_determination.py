@@ -120,8 +120,8 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
         mu_j_sk = [np.mean(trace['mu_%d_sk' % j], axis=0)
                    for j in range(self.ploidy_workspace.num_contigs)]
         alpha_js = np.mean(trace['alpha_js'], axis=0)
-        hist_j_skm = [np.mean(trace['hist_%d_skm' % j], axis=0)
-                      for j in range(self.ploidy_workspace.num_contigs)]
+        # hist_j_skm = [np.mean(trace['hist_%d_skm' % j], axis=0)
+        #               for j in range(self.ploidy_workspace.num_contigs)]
         print("Sampling done.")
 
         print("d_s")
@@ -141,19 +141,19 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                     t_j[j] = np.mean(np.repeat(counts_m_masked[1:], self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked[1:]]))
                     k = np.argmax(pi_i_sk[i][s])
                     print(mu_j_sk[j][s, k], alpha_js[j, s])
-                    # mu = mu_j_sk[j][s, k]
-                    # alpha = alpha_js[j, s]
-                    # pdf = nbinom.pmf(k=self.ploidy_workspace.counts_m, n=alpha, p=alpha / (mu + alpha))
-                    # plt.semilogy(self.ploidy_workspace.hist_sjm_full[s, j] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]), color='k', lw=0.5, alpha=0.2)
-                    # plt.semilogy(counts_m_masked, self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]),
-                    #              c='b' if j < self.ploidy_workspace.num_contigs - 2 else 'r', lw=1, alpha=0.5)
-                    # plt.semilogy(self.ploidy_workspace.counts_m, pdf, color='g')
-                    plt.semilogy(self.ploidy_workspace.hist_sjm_full[s, j], color='k', lw=0.5, alpha=0.1)
-                    plt.semilogy(counts_m_masked, self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked],
+                    mu = mu_j_sk[j][s, k]
+                    alpha = alpha_js[j, s]
+                    pdf = nbinom.pmf(k=counts_m_masked, n=alpha, p=alpha / (mu + alpha))
+                    plt.semilogy(self.ploidy_workspace.hist_sjm_full[s, j] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]), color='k', lw=0.5, alpha=0.1)
+                    plt.semilogy(counts_m_masked, self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]),
                                  c='b' if j < self.ploidy_workspace.num_contigs - 2 else 'r', lw=1, alpha=0.25)
-                    plt.semilogy(counts_m_masked, hist_j_skm[j][s, k][counts_m_masked], color='g')
+                    plt.semilogy(counts_m_masked, pdf, color='g')
+                    # plt.semilogy(self.ploidy_workspace.hist_sjm_full[s, j], color='k', lw=0.5, alpha=0.1)
+                    # plt.semilogy(counts_m_masked, self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked],
+                    #              c='b' if j < self.ploidy_workspace.num_contigs - 2 else 'r', lw=1, alpha=0.25)
+                    # plt.semilogy(counts_m_masked, hist_j_skm[j][s, k][counts_m_masked], color='g')
                     ax.set_xlim([0, self.ploidy_workspace.num_counts])
-                    # ax.set_ylim([1E-5, 1E-1])
+                    ax.set_ylim([1E-5, 1E-1])
             print(s, t_j / np.mean(t_j))
             ax.set_xlabel('count', size=14)
             # ax.set_ylabel('number of intervals', size=14)
