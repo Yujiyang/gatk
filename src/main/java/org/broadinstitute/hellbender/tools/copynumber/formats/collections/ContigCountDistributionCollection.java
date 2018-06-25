@@ -1,11 +1,13 @@
 package org.broadinstitute.hellbender.tools.copynumber.formats.collections;
 
+import htsjdk.samtools.util.OverlapDetector;
 import org.apache.commons.collections4.ListUtils;
 import org.broadinstitute.hellbender.tools.copynumber.DetermineGermlineContigPloidy;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.Metadata;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.SampleLocatableMetadata;
 import org.broadinstitute.hellbender.tools.copynumber.formats.records.ContigCountDistribution;
 import org.broadinstitute.hellbender.tools.copynumber.formats.records.SimpleCount;
+import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.param.ParamUtils;
 import org.broadinstitute.hellbender.utils.tsv.DataLine;
@@ -70,15 +72,20 @@ public final class ContigCountDistributionCollection extends AbstractRecordColle
     }
 
     public ContigCountDistributionCollection(final SimpleCountCollection readCounts,
+                                             final SimpleIntervalCollection intervals,
                                              final int maximumCount) {
-        this(Utils.nonNull(readCounts).getMetadata(), constructContigCountDistributions(readCounts, maximumCount));
+        this(Utils.nonNull(readCounts).getMetadata(), constructContigCountDistributions(readCounts, Utils.nonNull(intervals), maximumCount));
     }
 
     private static List<ContigCountDistribution> constructContigCountDistributions(final SimpleCountCollection readCounts,
+                                                                                   final SimpleIntervalCollection intervals,
                                                                                    final int maximumCount) {
         Utils.nonNull(readCounts);
+        Utils.nonNull(intervals);
         ParamUtils.isPositiveOrZero(maximumCount, "Maximum count must be non-negative.");
+        final OverlapDetector<SimpleInterval> intervalOverlapDetector = intervals.getOverlapDetector();
         final Map<String, Map<Integer, Integer>> mapOfMaps = readCounts.getRecords().stream()
+                .filter(intervalOverlapDetector::overlapsAny)
                 .collect(Collectors.groupingBy(
                         SimpleCount::getContig,
                         LinkedHashMap::new,

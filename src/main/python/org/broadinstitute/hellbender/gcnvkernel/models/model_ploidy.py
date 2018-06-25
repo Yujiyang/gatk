@@ -253,12 +253,12 @@ class PloidyWorkspace:
                     j = self.contig_to_index_map[contig]
                     counts_m_masked = self.counts_m[self.hist_sjm_mask[s, j]]
                     t_j[j] = np.mean(np.repeat(counts_m_masked[1:], self.hist_sjm_full[s, j, counts_m_masked[1:]]))
-                    plt.semilogy(self.hist_sjm_full[s, j] / np.sum(self.hist_sjm_full[s, j]), color='k', lw=0.5, alpha=0.1)
-                    plt.semilogy(counts_m_masked, self.hist_sjm_full[s, j, counts_m_masked] / np.sum(self.hist_sjm_full[s, j]),
-                                 c='b' if j < self.num_contigs - 2 else 'r', lw=1, alpha=0.25)
-                    # plt.semilogy(self.hist_sjm_full[s, j], color='k', lw=0.5, alpha=0.1)
-                    # plt.semilogy(counts_m_masked, self.hist_sjm_full[s, j, counts_m_masked],
+                    # plt.semilogy(self.hist_sjm_full[s, j] / np.sum(self.hist_sjm_full[s, j]), color='k', lw=0.5, alpha=0.1)
+                    # plt.semilogy(counts_m_masked, self.hist_sjm_full[s, j, counts_m_masked] / np.sum(self.hist_sjm_full[s, j]),
                     #              c='b' if j < self.num_contigs - 2 else 'r', lw=1, alpha=0.25)
+                    plt.semilogy(self.hist_sjm_full[s, j], color='k', lw=0.5, alpha=0.1)
+                    plt.semilogy(counts_m_masked, self.hist_sjm_full[s, j, counts_m_masked],
+                                 c='b' if j < self.num_contigs - 2 else 'r', lw=1, alpha=0.25)
                     ax.set_xlim([0, self.num_counts])
                     ax.set_ylim([1E-5, 1E-1])
                     # ax.set_ylim([1, 2 * np.max(self.hist_sjm_full)])
