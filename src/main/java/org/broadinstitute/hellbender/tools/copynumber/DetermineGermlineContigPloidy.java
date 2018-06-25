@@ -1,6 +1,7 @@
 package org.broadinstitute.hellbender.tools.copynumber;
 
 import htsjdk.samtools.SAMSequenceDictionary;
+import htsjdk.samtools.util.OverlapDetector;
 import org.broadinstitute.barclay.argparser.*;
 import org.broadinstitute.barclay.help.DocumentedFeature;
 import org.broadinstitute.hellbender.cmdline.CommandLineProgram;
@@ -273,18 +274,27 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
         //get sequence dictionary and intervals from the first read-count file to use to validate remaining files
         //(this first file is read again below, which is slightly inefficient but is probably not worth the extra code)
         final File firstReadCountFile = inputReadCountFiles.get(0);
-        logger.info(String.format("Retrieving intervals from first read-count file (%s)...", firstReadCountFile));
         final SimpleCountCollection firstReadCounts = SimpleCountCollection.read(firstReadCountFile);
         final SAMSequenceDictionary sequenceDictionary = firstReadCounts.getMetadata().getSequenceDictionary();
-        final List<SimpleInterval> intervals = firstReadCounts.getIntervals();
+        final LocatableMetadata metadata = new SimpleLocatableMetadata(sequenceDictionary);
+
+        if (intervalArgumentCollection.intervalsSpecified()) {
+            logger.info("Intervals specified...");
+            CopyNumberArgumentValidationUtils.validateIntervalArgumentCollection(intervalArgumentCollection);
+            specifiedIntervals = new SimpleIntervalCollection(metadata,
+                    intervalArgumentCollection.getIntervals(sequenceDictionary));
+        } else {
+            logger.info(String.format("Retrieving intervals from first read-count file (%s)...",
+                    firstReadCountFile));
+            specifiedIntervals = new SimpleIntervalCollection(metadata, firstReadCounts.getIntervals());
+        }
 
         //read in count files and output intervals and contig x count distribution collections to temporary files
         final File intervalsFile = IOUtils.createTempFile("intervals", ".tsv");
-        final LocatableMetadata metadata = new SimpleLocatableMetadata(sequenceDictionary);
-        new SimpleIntervalCollection(metadata, intervals).write(intervalsFile);
+        specifiedIntervals.write(intervalsFile);
         final File contigCountDistributionCollectionsDir = IOUtils.createTempDir("contig-count-distribution-collections");
         final List<File> contigCountDistributionCollectionFiles =
-                writeContigCountDistributionCollections(contigCountDistributionCollectionsDir, metadata, intervals);
+                writeContigCountDistributionCollections(contigCountDistributionCollectionsDir, metadata);
 
         //call python inference code
         final boolean pythonReturnCode = executeDeterminePloidyAndDepthPythonScript(
@@ -376,11 +386,13 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
     }
 
     private List<File> writeContigCountDistributionCollections(final File contigCountDistributionCollectionsDir,
-                                                               final LocatableMetadata metadata,
-                                                               final List<SimpleInterval> intervals) {
+                                                               final LocatableMetadata metadata) {
         logger.info("Validating and aggregating per-contig count distributions from input read-count files...");
         final int numSamples = inputReadCountFiles.size();
         final List<File> contigCountDistributionCollectionFiles = new ArrayList<>(numSamples);
+        final Set<SimpleInterval> intervalSubset = new HashSet<>(specifiedIntervals.getRecords());
+        final OverlapDetector<SimpleInterval> specifiedIntervalsOverlapDetector = specifiedIntervals.getOverlapDetector();
+
         final ListIterator<File> inputReadCountFilesIterator = inputReadCountFiles.listIterator();
         while (inputReadCountFilesIterator.hasNext()) {
             final int sampleIndex = inputReadCountFilesIterator.nextIndex();
@@ -393,13 +405,13 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
                 logger.warn("Sequence dictionary for read-count file %s does not match that " +
                         "in other read-count files.", inputReadCountFile);
             }
-            Utils.validateArg(readCounts.getIntervals().equals(intervals),
-                    String.format("Intervals for read-count file %s do not match those in other " +
-                            "read-count files.", inputReadCountFile));
+            Utils.validateArg(new HashSet<>(readCounts.getIntervals()).containsAll(intervalSubset),
+                    String.format("Intervals for read-count file %s do not contain all specified intervals.",
+                            inputReadCountFile));
             //calculate per-contig count distributions and write temporary file for this sample
             final File contigCountDistributionCollectionFile =
                     new File(contigCountDistributionCollectionsDir, String.format("SAMPLE-%d.tsv", sampleIndex));
-            new ContigCountDistributionCollection(readCounts, specifiedIntervals, maximumCount)
+            new ContigCountDistributionCollection(readCounts, intervalSubset, maximumCount)
                     .write(contigCountDistributionCollectionFile);
             contigCountDistributionCollectionFiles.add(contigCountDistributionCollectionFile);
         }

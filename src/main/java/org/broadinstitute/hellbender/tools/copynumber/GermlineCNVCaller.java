@@ -382,10 +382,10 @@ public final class GermlineCNVCaller extends CommandLineProgram {
     private List<File> writeIntervalSubsetReadCountFiles() {
         logger.info("Validating and aggregating data from input read-count files...");
         final int numSamples = inputReadCountFiles.size();
-        final ListIterator<File> inputReadCountFilesIterator = inputReadCountFiles.listIterator();
         final List<File> intervalSubsetReadCountFiles = new ArrayList<>(numSamples);
         final Set<SimpleInterval> intervalSubset = new HashSet<>(specifiedIntervals.getRecords());
 
+        final ListIterator<File> inputReadCountFilesIterator = inputReadCountFiles.listIterator();
         while (inputReadCountFilesIterator.hasNext()) {
             final int sampleIndex = inputReadCountFilesIterator.nextIndex();
             final File inputReadCountFile = inputReadCountFilesIterator.next();

@@ -260,7 +260,7 @@ class PloidyWorkspace:
                     plt.semilogy(counts_m_masked, self.hist_sjm_full[s, j, counts_m_masked],
                                  c='b' if j < self.num_contigs - 2 else 'r', lw=1, alpha=0.25)
                     ax.set_xlim([0, self.num_counts])
-                    ax.set_ylim([1E-5, 1E-1])
+                    # ax.set_ylim([1E-5, 1E-1])
                     # ax.set_ylim([1, 2 * np.max(self.hist_sjm_full)])
 
             print(s, t_j / np.mean(t_j))

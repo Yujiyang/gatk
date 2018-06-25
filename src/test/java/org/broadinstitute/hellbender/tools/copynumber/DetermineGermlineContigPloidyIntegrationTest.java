@@ -5,12 +5,14 @@ import htsjdk.samtools.SAMSequenceRecord;
 import org.apache.commons.math3.random.RandomDataGenerator;
 import org.broadinstitute.hellbender.CommandLineProgramTest;
 import org.broadinstitute.hellbender.cmdline.StandardArgumentDefinitions;
+import org.broadinstitute.hellbender.cmdline.argumentcollections.IntervalArgumentCollection;
 import org.broadinstitute.hellbender.exceptions.UserException;
 import org.broadinstitute.hellbender.tools.copynumber.arguments.CopyNumberStandardArgument;
 import org.broadinstitute.hellbender.tools.copynumber.arguments.GermlineContigPloidyModelArgumentCollection;
 import org.broadinstitute.hellbender.tools.copynumber.formats.collections.SimpleCountCollection;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.SimpleSampleLocatableMetadata;
 import org.broadinstitute.hellbender.tools.copynumber.formats.records.SimpleCount;
+import org.broadinstitute.hellbender.utils.IntervalMergingRule;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
 import org.broadinstitute.hellbender.utils.Utils;
 import org.broadinstitute.hellbender.utils.param.ParamUtils;
@@ -245,6 +247,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "500")
+                .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "COHORT")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -255,9 +258,12 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         ANEUPLOIDY_COUNT_FILES.forEach(argsBuilder::addInput);
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors.tsv"))
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
+                .addArgument(StandardArgumentDefinitions.INTERVALS_LONG_NAME, "/home/slee/Storage/Downloads/UmapAnnotater/hg38.wgs.XY.intervals.preprocessed.mapp_gt_0.9.interval_list")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "250")
                 .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.01")
+                .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "COHORT")
+                .addArgument(IntervalArgumentCollection.INTERVAL_MERGING_RULE_LONG_NAME, IntervalMergingRule.OVERLAPPING_ONLY.toString())
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -268,9 +274,12 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         ANEUPLOIDY_COUNT_FILES.forEach(argsBuilder::addInput);
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors_full.tsv"))
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
+                .addArgument(StandardArgumentDefinitions.INTERVALS_LONG_NAME, "/home/slee/Storage/Downloads/UmapAnnotater/hg38.wgs.XY.intervals.preprocessed.mapp_gt_0.9.interval_list")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-aneuploidy-cohort-full")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "250")
                 .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.01")
+                .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "COHORT")
+                .addArgument(IntervalArgumentCollection.INTERVAL_MERGING_RULE_LONG_NAME, IntervalMergingRule.OVERLAPPING_ONLY.toString())
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -281,9 +290,12 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         SFARI_COUNT_FILES.forEach(argsBuilder::addInput);
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors_hg19.tsv"))
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
+                .addArgument(StandardArgumentDefinitions.INTERVALS_LONG_NAME, "/home/slee/Storage/Downloads/UmapAnnotater/NimbleGenEZ2Tiled_hg19_v2.preprocessed.mapp_gt_0.9.interval_list")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-sfari-cohort")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
                 .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.1")
+                .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "COHORT")
+                .addArgument(IntervalArgumentCollection.INTERVAL_MERGING_RULE_LONG_NAME, IntervalMergingRule.OVERLAPPING_ONLY.toString())
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -294,8 +306,11 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         SFARI_COUNT_FILES.forEach(argsBuilder::addInput);
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors_hg19_full.tsv"))
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
+                .addArgument(StandardArgumentDefinitions.INTERVALS_LONG_NAME, "/home/slee/Storage/Downloads/UmapAnnotater/NimbleGenEZ2Tiled_hg19_v2.preprocessed.mapp_gt_0.9.interval_list")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-sfari-cohort-full")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "1000")
+                .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "COHORT")
+                .addArgument(IntervalArgumentCollection.INTERVAL_MERGING_RULE_LONG_NAME, IntervalMergingRule.OVERLAPPING_ONLY.toString())
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -306,6 +321,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         SIMULATED_COUNT_FILES.forEach(argsBuilder::addInput);
         argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
+                .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "COHORT")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -316,6 +332,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         argsBuilder.addInput(SIMULATED_COUNT_FILES.get(0));
         argsBuilder.addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
+                .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "COHORT")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -328,6 +345,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, PLOIDY_STATE_PRIORS_FILE)
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, OUTPUT_DIR.getAbsolutePath())
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-cohort")
+                .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "COHORT")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -344,6 +362,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                 .addArgument(CopyNumberStandardArgument.MODEL_LONG_NAME,
                         new File(OUTPUT_DIR, "test-ploidy-cohort-model").getAbsolutePath())
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "500")
+                .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "CASE")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }
@@ -357,6 +376,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-ploidy-case")
                 .addArgument(CopyNumberStandardArgument.MODEL_LONG_NAME,
                         new File(OUTPUT_DIR, "test-ploidy-cohort-model").getAbsolutePath())
+                .addArgument(DetermineGermlineContigPloidy.RUN_MODE_LONG_NAME, "CASE")
                 .addArgument(StandardArgumentDefinitions.VERBOSITY_NAME, "DEBUG");
         runCommandLine(argsBuilder);
     }

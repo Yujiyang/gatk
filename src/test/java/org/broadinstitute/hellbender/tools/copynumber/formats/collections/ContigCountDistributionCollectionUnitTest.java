@@ -2,6 +2,7 @@ package org.broadinstitute.hellbender.tools.copynumber.formats.collections;
 
 import htsjdk.samtools.SAMSequenceDictionary;
 import htsjdk.samtools.SAMSequenceRecord;
+import htsjdk.samtools.util.OverlapDetector;
 import org.broadinstitute.hellbender.tools.copynumber.formats.metadata.SimpleSampleLocatableMetadata;
 import org.broadinstitute.hellbender.tools.copynumber.formats.records.SimpleCount;
 import org.broadinstitute.hellbender.utils.SimpleInterval;
@@ -10,9 +11,7 @@ import org.testng.Assert;
 import org.testng.annotations.Test;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
+import java.util.*;
 
 public final class ContigCountDistributionCollectionUnitTest {
     @Test
@@ -49,8 +48,10 @@ public final class ContigCountDistributionCollectionUnitTest {
                 )
         );
 
+        final Set<SimpleInterval> intervalSubset = new HashSet<>(counts.getIntervals());
         final int maximumCount = 5;
-        final ContigCountDistributionCollection result = new ContigCountDistributionCollection(counts, maximumCount);
+        final ContigCountDistributionCollection result = new ContigCountDistributionCollection(
+                counts, intervalSubset, maximumCount);
 
         final Map<Integer, Integer> countDistributionExpected = new LinkedHashMap<>();
         countDistributionExpected.put(0, 2);

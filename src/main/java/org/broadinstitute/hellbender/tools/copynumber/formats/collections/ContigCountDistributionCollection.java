@@ -13,10 +13,7 @@ import org.broadinstitute.hellbender.utils.param.ParamUtils;
 import org.broadinstitute.hellbender.utils.tsv.DataLine;
 import org.broadinstitute.hellbender.utils.tsv.TableColumnCollection;
 
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -72,20 +69,19 @@ public final class ContigCountDistributionCollection extends AbstractRecordColle
     }
 
     public ContigCountDistributionCollection(final SimpleCountCollection readCounts,
-                                             final SimpleIntervalCollection intervals,
+                                             final Set<SimpleInterval> intervalSubset,
                                              final int maximumCount) {
-        this(Utils.nonNull(readCounts).getMetadata(), constructContigCountDistributions(readCounts, Utils.nonNull(intervals), maximumCount));
+        this(Utils.nonNull(readCounts).getMetadata(), constructContigCountDistributions(readCounts, Utils.nonEmpty(intervalSubset), maximumCount));
     }
 
     private static List<ContigCountDistribution> constructContigCountDistributions(final SimpleCountCollection readCounts,
-                                                                                   final SimpleIntervalCollection intervals,
+                                                                                   final Set<SimpleInterval> intervalSubset,
                                                                                    final int maximumCount) {
         Utils.nonNull(readCounts);
-        Utils.nonNull(intervals);
+        Utils.nonEmpty(intervalSubset);
         ParamUtils.isPositiveOrZero(maximumCount, "Maximum count must be non-negative.");
-        final OverlapDetector<SimpleInterval> intervalOverlapDetector = intervals.getOverlapDetector();
         final Map<String, Map<Integer, Integer>> mapOfMaps = readCounts.getRecords().stream()
-                .filter(intervalOverlapDetector::overlapsAny)
+                .filter(c -> intervalSubset.contains(c.getInterval()))
                 .collect(Collectors.groupingBy(
                         SimpleCount::getContig,
                         LinkedHashMap::new,
