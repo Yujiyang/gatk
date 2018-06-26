@@ -1,9 +1,9 @@
-import csv
 import logging
 import numpy as np
 import os
 import pandas as pd
 from typing import List
+from collections import OrderedDict
 
 from . import io_commons
 from . import io_consts
@@ -30,6 +30,7 @@ def read_sample_coverage_metadata(sample_metadata_collection: SampleMetadataColl
         list of samples in the same order as encountered in `input_files`
     """
     sample_names = []
+    max_count = 0
     for sample_index, input_file in enumerate(input_files):
         coverage_metadata_pd = pd.read_csv(input_file, delimiter=delimiter, comment=comment)
         found_columns_list = [str(column) for column in coverage_metadata_pd.columns.values]
@@ -39,7 +40,6 @@ def read_sample_coverage_metadata(sample_metadata_collection: SampleMetadataColl
         if sample_index == 0:
             max_count = len(count_columns) - 1
             contig_list = coverage_metadata_pd[io_consts.contig_column_name].tolist()
-            num_contigs = len(contig_list)
         else:
             assert len(count_columns) - 1 == max_count, \
                 "Maximum count in per-contig count distribution file \"{0}\" " \
@@ -49,10 +49,11 @@ def read_sample_coverage_metadata(sample_metadata_collection: SampleMetadataColl
                 "do not match those in other files.".format(coverage_metadata_pd[io_consts.contig_column_name].tolist(), input_file)
         sample_name = io_commons.extract_sample_name_from_header(input_file)
         sample_names.append(sample_name)
-        n_jm = np.asarray([coverage_metadata_pd.loc[j, count_columns] for j in range(num_contigs)],
-                          dtype=types.med_uint)
+        contig_hist_m = OrderedDict((contig, np.asarray(coverage_metadata_pd.loc[contig_index, count_columns],
+                                                        dtype=types.med_uint))
+                                    for contig_index, contig in enumerate(contig_list))
         sample_metadata_collection.add_sample_coverage_metadata(SampleCoverageMetadata(
-            sample_name, n_jm, contig_list))
+            sample_name, contig_hist_m))
 
     return sample_names
 

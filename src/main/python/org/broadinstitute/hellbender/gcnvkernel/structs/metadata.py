@@ -1,5 +1,6 @@
 import numpy as np
 from typing import List, Set, Dict
+from collections import OrderedDict
 from .interval import Interval
 from .. import types
 import logging
@@ -52,29 +53,29 @@ class SampleCoverageMetadata:
 
     def __init__(self,
                  sample_name: str,
-                 hist_jm: np.ndarray,
-                 contig_list: List[str]):
-        assert hist_jm.ndim == 2
-        assert hist_jm.shape[0] == len(contig_list)
-
+                 contig_hist_m: OrderedDict):
         self.sample_name = sample_name
-        self.contig_list = contig_list
+
+        max_count = 0
+        for contig_index, hist_m in enumerate(contig_hist_m.values()):
+            if contig_index == 0:
+                max_count = len(hist_m) - 1
+            else:
+                assert max_count == len(hist_m) - 1, \
+                "Sample ({0}) contains a count distribution from contig ({1}) with a different number of bins.".format(
+                    sample_name, contig_hist_m.keys()[contig_index])
 
         # per-contig count distribution
-        # j = contig index, m = count index
-        self.hist_jm = np.array(hist_jm, dtype=types.med_uint)
-        self.max_count = hist_jm.shape[1] - 1
-        self.n_total = np.sum(hist_jm * np.arange(self.max_count + 1))
-
-        self._contig_map = {contig: j for j, contig in enumerate(contig_list)}
+        self.contig_hist_m = contig_hist_m
+        self.max_count = max_count
 
     def _assert_contig_exists(self, contig: str):
-        assert contig in self._contig_map, \
+        assert contig in self.contig_hist_m, \
             "Sample ({0}) does not have coverage metadata for contig ({1})".format(self.sample_name, contig)
 
     def get_contig_count_distribution(self, contig: str):
         self._assert_contig_exists(contig)
-        return self.hist_jm[self._contig_map[contig]]
+        return self.contig_hist_m[contig]
 
     # @staticmethod
     # def generate_sample_coverage_metadata(sample_name,

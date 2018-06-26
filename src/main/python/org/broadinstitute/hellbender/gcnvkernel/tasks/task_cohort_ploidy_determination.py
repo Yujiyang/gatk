@@ -136,7 +136,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             t_j = np.zeros(self.ploidy_workspace.num_contigs)
             for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples):
                 for contig in contig_tuple:
-                    j = self.ploidy_workspace.contig_to_index_map[contig]
+                    j = self.ploidy_workspace.contig_to_ij_map[contig]
                     counts_m_masked = self.ploidy_workspace.counts_m[self.ploidy_workspace.hist_sjm_mask[s, j]]
                     t_j[j] = np.mean(np.repeat(counts_m_masked[1:], self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked[1:]]))
                     k = np.argmax(pi_i_sk[i][s])
