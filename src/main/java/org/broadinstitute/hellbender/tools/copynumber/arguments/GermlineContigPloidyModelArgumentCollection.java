@@ -84,14 +84,14 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             fullName = MOSAICISM_BIAS_LOWER_BOUND_LONG_NAME,
             optional = true
     )
-    private double mosaicismBiasLowerBound = -0.5;
+    private double mosaicismBiasLowerBound = -0.4;
 
     @Argument(
             doc = "Upper bound of the Cauchy prior on the per-sample-and-contig mosaicism bias.",
             fullName = MOSAICISM_BIAS_UPPER_BOUND_LONG_NAME,
             optional = true
     )
-    private double mosaicismBiasUpperBound = 0.5;
+    private double mosaicismBiasUpperBound = 0.4;
 
     @Argument(
             doc = "Standard deviation of the Cauchy prior on the per-sample-and-contig mosaicism bias.",

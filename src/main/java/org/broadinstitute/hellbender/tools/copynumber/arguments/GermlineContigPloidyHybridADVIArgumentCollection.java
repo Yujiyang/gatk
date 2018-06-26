@@ -10,7 +10,7 @@ public final class GermlineContigPloidyHybridADVIArgumentCollection extends Hybr
 
     private static final EnumMap<HybridADVIArgument, Object> defaultValue = new EnumMap<>(HybridADVIArgument.class);
     static {
-        defaultValue.put(HybridADVIArgument.LEARNING_RATE, 0.1);
+        defaultValue.put(HybridADVIArgument.LEARNING_RATE, 0.05);
         defaultValue.put(HybridADVIArgument.ADAMAX_BETA_1, 0.9);
         defaultValue.put(HybridADVIArgument.ADAMAX_BETA_2, 0.999);
         defaultValue.put(HybridADVIArgument.LOG_EMISSION_SAMPLES_PER_ROUND, 100);

@@ -323,6 +323,7 @@ class PloidyWorkspace:
         #                 break
 
         mask_sjm = np.full(np.shape(hist_sjm), True)
+        mask_sjm[hist_sjm < 10] = False
         mask_sjm[:, :, 0] = False
 
         return mask_sjm
