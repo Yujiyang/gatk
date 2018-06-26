@@ -56,18 +56,20 @@ class SampleCoverageMetadata:
                  contig_hist_m: OrderedDict):
         self.sample_name = sample_name
 
-        max_count = 0
-        for contig_index, hist_m in enumerate(contig_hist_m.values()):
-            if contig_index == 0:
+        max_count = None
+        for contig, hist_m in contig_hist_m.items():
+            if max_count is None:
                 max_count = len(hist_m) - 1
             else:
                 assert max_count == len(hist_m) - 1, \
                 "Sample ({0}) contains a count distribution from contig ({1}) with a different number of bins.".format(
-                    sample_name, contig_hist_m.keys()[contig_index])
+                    sample_name, contig)
 
         # per-contig count distribution
         self.contig_hist_m = contig_hist_m
         self.max_count = max_count
+        self.n_total = np.sum([hist_m * np.arange(self.max_count + 1)
+                               for hist_m in contig_hist_m.values()])
 
     def _assert_contig_exists(self, contig: str):
         assert contig in self.contig_hist_m, \
@@ -198,6 +200,7 @@ class SampleReadDepthMetadata:
         assert global_read_depth > 0
         assert average_ploidy > 0
         self.sample_name = sample_name
+
         self.global_read_depth = global_read_depth
         self.average_ploidy = average_ploidy
 

@@ -7,7 +7,7 @@ import pymc3 as pm
 import theano as th
 import theano.tensor as tt
 import pymc3.distributions.dist_math as pm_dist_math
-from pymc3 import Normal, Deterministic, DensityDist, Dirichlet, Bound, Uniform, NegativeBinomial, Poisson, Gamma, Exponential
+from pymc3 import Cauchy, Deterministic, DensityDist, Dirichlet, Bound, Uniform, NegativeBinomial, Poisson, Gamma, Exponential
 from typing import List, Dict, Set, Tuple
 import matplotlib.pyplot as plt
 
@@ -382,10 +382,11 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_global(b_j)
         b_j_norm = Deterministic('b_j_norm', var=b_j / tt.mean(b_j))
 
-        f_js = Bound(Normal,
+        f_js = Bound(Cauchy,
                      lower=mosaicism_bias_lower_bound,
                      upper=mosaicism_bias_upper_bound)('f_js',
-                                                       sd=mosaicism_bias_scale,
+                                                       alpha=0,
+                                                       beta=mosaicism_bias_scale,
                                                        shape=(num_contigs, num_samples))
         register_as_sample_specific(f_js, sample_axis=1)
 
