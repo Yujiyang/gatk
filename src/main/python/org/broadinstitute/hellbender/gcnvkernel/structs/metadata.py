@@ -200,7 +200,6 @@ class SampleReadDepthMetadata:
         assert global_read_depth > 0
         assert average_ploidy > 0
         self.sample_name = sample_name
-
         self.global_read_depth = global_read_depth
         self.average_ploidy = average_ploidy
 

@@ -286,12 +286,6 @@ class PloidyWorkspace:
             th.shared(np.zeros((self.num_samples, self.num_contigs, self.num_ploidies), dtype=types.floatX),
                       name='log_ploidy_emission_sjl', borrow=config.borrow_numpy)
 
-        self.d_s = None
-        self.b_j_norm = None
-        self.alpha_js = None
-        self.pi_i_sk = None
-        self.mu_j_sk = None
-
     @staticmethod
     def _get_contig_set_from_interval_list(interval_list: List[Interval]) -> Set[str]:
         return {interval.contig for interval in interval_list}
@@ -323,7 +317,7 @@ class PloidyWorkspace:
         #                 break
 
         mask_sjm = np.full(np.shape(hist_sjm), True)
-        mask_sjm[hist_sjm < 10] = False
+        # mask_sjm[hist_sjm < 10] = False
         mask_sjm[:, :, 0] = False
 
         return mask_sjm
