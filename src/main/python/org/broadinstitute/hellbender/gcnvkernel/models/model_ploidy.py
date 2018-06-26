@@ -292,8 +292,8 @@ class PloidyWorkspace:
 
     @staticmethod
     def _construct_mask(hist_sjm):
-        count_states = np.arange(0, hist_sjm.shape[2])
-        mode_sj = np.argmax(hist_sjm * (count_states >= 5), axis=2)
+        # count_states = np.arange(0, hist_sjm.shape[2])
+        # mode_sj = np.argmax(hist_sjm * (count_states >= 5), axis=2)
         # mask_sjm = np.full(np.shape(hist_sjm), False)
         # for s in range(np.shape(hist_sjm)[0]):
         #     for j in range(np.shape(hist_sjm)[1]):

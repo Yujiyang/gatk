@@ -30,14 +30,15 @@ def read_sample_coverage_metadata(sample_metadata_collection: SampleMetadataColl
         list of samples in the same order as encountered in `input_files`
     """
     sample_names = []
-    max_count = 0
+    max_count = None
+    contig_list = []
     for sample_index, input_file in enumerate(input_files):
         coverage_metadata_pd = pd.read_csv(input_file, delimiter=delimiter, comment=comment)
         found_columns_list = [str(column) for column in coverage_metadata_pd.columns.values]
         io_commons.assert_mandatory_columns({io_consts.contig_column_name}, set(found_columns_list), input_file)
         count_columns = found_columns_list.copy()
         count_columns.remove(io_consts.contig_column_name)
-        if sample_index == 0:
+        if max_count is None:
             max_count = len(count_columns) - 1
             contig_list = coverage_metadata_pd[io_consts.contig_column_name].tolist()
         else:

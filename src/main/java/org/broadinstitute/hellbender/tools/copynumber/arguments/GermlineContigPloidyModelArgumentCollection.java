@@ -84,14 +84,14 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             fullName = MOSAICISM_BIAS_LOWER_BOUND_LONG_NAME,
             optional = true
     )
-    private double mosaicismBiasLowerBound = -0.4;
+    private double mosaicismBiasLowerBound = -0.5;
 
     @Argument(
             doc = "Upper bound of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
             fullName = MOSAICISM_BIAS_UPPER_BOUND_LONG_NAME,
             optional = true
     )
-    private double mosaicismBiasUpperBound = 0.4;
+    private double mosaicismBiasUpperBound = 0.5;
 
     @Argument(
             doc = "Standard deviation of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
@@ -99,7 +99,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             minValue = 0.,
             optional = true
     )
-    private double mosaicismBiasScale = 0.01;
+    private double mosaicismBiasScale = 0.001;
 
     @Argument(
             doc = "Inverse mean of the exponential prior on the per-sample unexplained variance.",
