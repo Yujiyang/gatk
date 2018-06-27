@@ -15,7 +15,7 @@ RUN apt-get update && \
     dpkg-sig \
     iptables \
     samtools \
-    openjdk-8-jdk \
+    openjdk-8-jre \
     software-properties-common && \
     apt-get -y clean  && \
     apt-get -y autoclean  && \
@@ -29,11 +29,6 @@ RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
     apt-get -y autoremove && \
     apt-get -y clean
 ###########
-
-# Get OpenJDK8 on here.
-RUN apt-get update && \
-    apt-get install -y openjdk-8-jdk && \
-    apt-get clean
 
 # Set environment variables.
 ENV HOME /root
