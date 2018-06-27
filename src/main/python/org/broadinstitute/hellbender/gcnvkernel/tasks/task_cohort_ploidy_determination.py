@@ -158,14 +158,14 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             mu_j = [mu_j_sk[j][s, k_j[j]] for j in range(self.ploidy_workspace.num_contigs)]
 
             j = np.arange(self.ploidy_workspace.num_contigs)
-            axarr[1].errorbar(j, fit_mu_sj[s], yerr=fit_mu_sd_sj[s], c='g', ls='None', elinewidth=2)
+            axarr[1].errorbar(j, fit_mu_sj[s], yerr=fit_mu_sd_sj[s], c='g', fmt='o', elinewidth=2)
             axarr[1].scatter(j, mu_j, c='r')
             axarr[1].set_xticks(j)
             axarr[1].set_xticklabels(self.ploidy_workspace.contigs)
             axarr[2].set_xlabel('contig', size=14)
             axarr[1].set_ylabel('mu', size=14)
 
-            axarr[2].errorbar(j, fit_alpha_sj[s], yerr=fit_alpha_sd_sj[s], c='g', ls='None', elinewidth=2)
+            axarr[2].errorbar(j, fit_alpha_sj[s], yerr=fit_alpha_sd_sj[s], c='g', fmt='o', elinewidth=2)
             axarr[2].scatter(j, alpha_js[:, s], c='r')
             axarr[2].set_xticks(j)
             axarr[2].set_xticklabels(self.ploidy_workspace.contigs)
