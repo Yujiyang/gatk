@@ -110,8 +110,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
         self.ploidy_workspace = ploidy_workspace
 
     def disengage(self):
-        print("Sampling...")
-        num_samples = 100
+        num_samples = 1000
         trace = self.continuous_model_approx.sample(num_samples)
         pi_i_sk = [np.mean(trace['pi_%d_sk' % i], axis=0)
                    for i in range(self.ploidy_workspace.num_contig_tuples)]
@@ -120,10 +119,14 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
         mu_j_sk = [np.mean(trace['mu_%d_sk' % j], axis=0)
                    for j in range(self.ploidy_workspace.num_contigs)]
         alpha_js = np.mean(trace['alpha_js'], axis=0)
-        # hist_j_skm = [np.mean(trace['hist_%d_skm' % j], axis=0)
-        #               for j in range(self.ploidy_workspace.num_contigs)]
-        print("Sampling done.")
 
+        fit_mu_sj = self.ploidy_workspace.fit_mu_sj
+        fit_mu_sd_sj = self.ploidy_workspace.fit_mu_sd_sj
+        fit_alpha_sj = self.ploidy_workspace.fit_alpha_sj
+        fit_alpha_sd_sj = self.ploidy_workspace.fit_alpha_sd_sj
+
+        print("pi_i_sk")
+        print(pi_i_sk)
         print("d_s")
         print(d_s)
         print("b_j_norm")
@@ -132,30 +135,42 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
         for s, q_ploidy_jl in enumerate(q_ploidy_sjl):
             print('sample_{0}:'.format(s), np.argmax(q_ploidy_jl, axis=1))
         for s in range(self.ploidy_workspace.num_samples):
-            fig, ax = plt.subplots()
-            t_j = np.zeros(self.ploidy_workspace.num_contigs)
+            fig, axarr = plt.subplots(3, 1, figsize=(12, 8))
             for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples):
                 for contig in contig_tuple:
                     j = self.ploidy_workspace.contig_to_index_map[contig]
                     counts_m_masked = self.ploidy_workspace.counts_m[self.ploidy_workspace.hist_mask_sjm[s, j]]
-                    t_j[j] = np.mean(np.repeat(counts_m_masked[1:], self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked[1:]]))
-                    k = np.argmax(pi_i_sk[i][s])
-                    print(mu_j_sk[j][s, k], alpha_js[j, s])
-                    mu = mu_j_sk[j][s, k]
-                    alpha = alpha_js[j, s]
-                    pdf = nbinom.pmf(k=counts_m_masked, n=alpha, p=alpha / (mu + alpha))
-                    plt.semilogy(self.ploidy_workspace.hist_sjm_full[s, j] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]), color='k', lw=0.5, alpha=0.1)
-                    plt.semilogy(counts_m_masked, self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]),
-                                 c='b' if j < self.ploidy_workspace.num_contigs - 2 else 'r', lw=1, alpha=0.25)
-                    plt.semilogy(counts_m_masked, pdf, color='g')
-                    # plt.semilogy(self.ploidy_workspace.hist_sjm_full[s, j], color='k', lw=0.5, alpha=0.1)
-                    # plt.semilogy(counts_m_masked, self.ploidy_workspace.hist_sjm_full[s, j, counts_m_masked],
-                    #              c='b' if j < self.ploidy_workspace.num_contigs - 2 else 'r', lw=1, alpha=0.25)
-                    # plt.semilogy(counts_m_masked, hist_j_skm[j][s, k][counts_m_masked], color='g')
-                    ax.set_xlim([0, self.ploidy_workspace.num_counts])
-                    ax.set_ylim([1E-5, 1E-1])
-            print(s, t_j / np.mean(t_j))
-            ax.set_xlabel('count', size=14)
-            # ax.set_ylabel('number of intervals', size=14)
-            fig.tight_layout(pad=0.1)
+                    hist_norm_m = self.ploidy_workspace.hist_sjm_full[s, j] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j])
+                    axarr[0].semilogy(hist_norm_m, c='b', alpha=0.25)
+                    axarr[0].semilogy(counts_m_masked, hist_norm_m[counts_m_masked], c='b', alpha=0.5)
+                    mu = fit_mu_sj[s, j]
+                    alpha = fit_alpha_sj[s, j]
+                    pdf_m = nbinom.pmf(k=counts_m_masked, n=alpha, p=alpha / (mu + alpha))
+                    axarr[0].semilogy(counts_m_masked, pdf_m, c='g', lw=1)
+                    axarr[0].set_xlim([0, self.ploidy_workspace.num_counts])
+                    axarr[0].set_ylim([1 / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]), 2 * np.max(hist_norm_m)])
+            axarr[0].set_xlabel('count', size=14)
+            axarr[0].set_ylabel('density', size=14)
+
+            k_j = [np.argmax(pi_i_sk[i][s])
+                   for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples)
+                   for j in range(len(contig_tuple))]
+            mu_j = [mu_j_sk[j][s, k_j[j]] for j in range(self.ploidy_workspace.num_contigs)]
+
+            j = np.arange(self.ploidy_workspace.num_contigs)
+            axarr[1].errorbar(j, fit_mu_sj[s], yerr=fit_mu_sd_sj[s], c='g', ls='None', elinewidth=2)
+            axarr[1].scatter(j, mu_j, c='r')
+            axarr[1].set_xticks(j)
+            axarr[1].set_xticklabels(self.ploidy_workspace.contigs)
+            axarr[2].set_xlabel('contig', size=14)
+            axarr[1].set_ylabel('mu', size=14)
+
+            axarr[2].errorbar(j, fit_alpha_sj[s], yerr=fit_alpha_sd_sj[s], c='g', ls='None', elinewidth=2)
+            axarr[2].scatter(j, alpha_js[:, s], c='r')
+            axarr[2].set_xticks(j)
+            axarr[2].set_xticklabels(self.ploidy_workspace.contigs)
+            axarr[2].set_xlabel('contig', size=14)
+            axarr[2].set_ylabel('alpha', size=14)
+
+            fig.tight_layout(pad=0.2)
             fig.savefig('/home/slee/working/gatk/test_files/plots/sample_{0}.png'.format(s))
