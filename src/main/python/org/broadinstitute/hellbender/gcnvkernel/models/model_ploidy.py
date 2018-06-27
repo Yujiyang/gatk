@@ -467,8 +467,8 @@ class PloidyModel(GeneralizedContinuousModel):
                                      sd=alpha_sd_sj[:, j, np.newaxis]).logp(alpha_js[j, :, np.newaxis])
                          for j in range(num_contigs)]
             return tt.stack([tt.sum(log_ploidy_state_priors_i_k[i][np.newaxis, :] + \
-                                    tt.sum(pm.logsumexp(tt.log(pi_i_sk[i] + eps) + logp_j_sk[contig_to_index_map[contig]], axis=1)))
-                    for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
+                                    pm.logsumexp(tt.log(pi_i_sk[i] + eps) + logp_j_sk[contig_to_index_map[contig]], axis=1))
+                             for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
         DensityDist(name='logp', logp=logp, observed=[self.ploidy_workspace.fit_mu_sj,
                                                       self.ploidy_workspace.fit_mu_sd_sj,
