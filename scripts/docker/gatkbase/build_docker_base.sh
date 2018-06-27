@@ -42,7 +42,7 @@ fi
 
 # Build
 echo "Building image to tag ${FULL_PATH}..."
-docker build -t ${FULL_PATH} . ##TODO THIS NEEDS SQUASH ADDED BACK IN
+docker build --squash -t ${FULL_PATH} .
 
 ## Push
 if [ -n "${IS_PUSH}" ]; then

@@ -61,3 +61,4 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9 && \
 
 COPY install_R_packages.R install_R_packages.R
 RUN Rscript install_R_packages.R
+RUN rm -rf /var/lib/apt/lists/*
