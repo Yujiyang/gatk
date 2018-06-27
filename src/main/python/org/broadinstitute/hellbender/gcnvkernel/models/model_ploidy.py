@@ -168,6 +168,9 @@ class PloidyModelConfig:
 
 class PloidyWorkspace:
     epsilon: float = 1e-10
+    alpha_max: float = 1e5
+    num_negative_binomial_fit_advi_iterations: int = 10000
+    negative_binomial_fit_advi_random_seed: int = 1
 
     """Workspace for storing data structures that are shared between continuous and discrete sectors
     of the germline contig ploidy model."""
@@ -243,8 +246,12 @@ class PloidyWorkspace:
         # hist_sjm_masked = np.ma.masked_where(self.hist_sjm_full == 0, self.hist_sjm_full)
         # hist_sjm_masked = np.ma.filled(hist_sjm_masked.astype(float), np.nan)
         # hist_cutoff_sj = np.nanpercentile(hist_sjm_masked, mask_percentile, axis=-1)
-        # self.hist_sjm_mask = self.hist_sjm_full > hist_cutoff_sj[:, :, np.newaxis]
-        self.hist_sjm_mask = self._construct_mask(self.hist_sjm_full)
+        # self.hist_mask_sjm = self.hist_sjm_full > hist_cutoff_sj[:, :, np.newaxis]
+        self.hist_mask_sjm = self._construct_mask(self.hist_sjm_full)
+
+        print("Fitting negative biniomials...")
+        mu_sj, alpha_sj = self._fit_negative_binomial(self.hist_sjm_full, self.hist_mask_sjm)
+        print("Fit complete.")
 
         for s in range(self.num_samples):
             fig, ax = plt.subplots()
@@ -252,7 +259,7 @@ class PloidyWorkspace:
             for i, contig_tuple in enumerate(self.contig_tuples):
                 for contig in contig_tuple:
                     j = self.contig_to_index_map[contig]
-                    counts_m_masked = self.counts_m[self.hist_sjm_mask[s, j]]
+                    counts_m_masked = self.counts_m[self.hist_mask_sjm[s, j]]
                     t_j[j] = np.mean(np.repeat(counts_m_masked[1:], self.hist_sjm_full[s, j, counts_m_masked[1:]]))
                     plt.semilogy(self.hist_sjm_full[s, j] / np.sum(self.hist_sjm_full[s, j]), color='k', lw=0.5, alpha=0.1)
                     plt.semilogy(counts_m_masked, self.hist_sjm_full[s, j, counts_m_masked] / np.sum(self.hist_sjm_full[s, j]),
@@ -315,12 +322,61 @@ class PloidyWorkspace:
         #                     mask_sjm[s, j, m] = True
         #             else:
         #                 break
-
         mask_sjm = np.full(np.shape(hist_sjm), True)
         # mask_sjm[hist_sjm < 10] = False
         mask_sjm[:, :, 0] = False
-
         return mask_sjm
+
+    @staticmethod
+    def _fit_negative_binomial(hist_sjm, hist_mask_sjm):
+        eps = PloidyWorkspace.epsilon
+        alpha_max = PloidyWorkspace.alpha_max
+        num_iterations = PloidyWorkspace.num_negative_binomial_fit_advi_iterations
+        random_seed = PloidyWorkspace.negative_binomial_fit_advi_random_seed
+        def bound(logp, *conditions, **kwargs):
+            broadcast_conditions = kwargs.get('broadcast_conditions', True)
+            if broadcast_conditions:
+                alltrue = pm_dist_math.alltrue_elemwise
+            else:
+                alltrue = pm_dist_math.alltrue_scalar
+            return tt.switch(alltrue(conditions), logp, 0)
+
+        def negative_binomial_logp(mu, alpha, value, mask=True):
+            return bound(pm_dist_math.binomln(value + alpha - 1, value)
+                         + pm_dist_math.logpow(mu / (mu + alpha), value)
+                         + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
+                         mu > 0, value >= 0, alpha > 0, mask)
+
+        def poisson_logp(mu, value, mask=True):
+            log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu >= 0, value >= 0, mask)
+            # Return zero when mu and value are both zero
+            return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)
+
+        num_samples = hist_sjm.shape[0]
+        num_contigs = hist_sjm.shape[1]
+        num_counts = hist_sjm.shape[2]
+        counts_m = np.arange(num_counts)
+        num_occurrences_sj = np.sum(hist_sjm * hist_mask_sjm, axis=-1)
+        with pm.Model() as model:
+            mu_sj = Uniform('mu_sj',
+                            upper=num_counts,
+                            shape=(num_samples, num_contigs))
+            alpha_sj = Uniform('alpha_sj',
+                               upper=alpha_max,
+                               shape=(num_samples, num_contigs))
+            p_sjm = tt.exp(negative_binomial_logp(mu=mu_sj.dimshuffle(0, 1, 'x') + eps,
+                                                  alpha=alpha_sj.dimshuffle(0, 1, 'x'),
+                                                  value=counts_m[np.newaxis, np.newaxis, :],
+                                                  mask=hist_mask_sjm))
+            def logp(hist_sjm):
+                return tt.sum(poisson_logp(mu=num_occurrences_sj[:, :, np.newaxis] * p_sjm + eps,
+                                           value=hist_sjm,
+                                           mask=hist_mask_sjm))
+            DensityDist(name='logp_hist_sjm', logp=logp, observed=hist_sjm)
+
+        approx = pm.fit(n=num_iterations, model=model, random_seed=random_seed)
+        print(approx.)
+        print(approx.logp(approx.bij.))
 
 
 class PloidyModel(GeneralizedContinuousModel):
@@ -351,7 +407,7 @@ class PloidyModel(GeneralizedContinuousModel):
         counts_m = ploidy_workspace.counts_m
         contig_to_index_map = ploidy_workspace.contig_to_index_map
         hist_sjm = ploidy_workspace.hist_sjm
-        hist_sjm_mask = ploidy_workspace.hist_sjm_mask
+        hist_mask_sjm = ploidy_workspace.hist_mask_sjm
         ploidy_state_priors_i_k = ploidy_workspace.ploidy_state_priors_i_k
         log_ploidy_state_priors_i_k = ploidy_workspace.log_ploidy_state_priors_i_k
         ploidy_j_k = ploidy_workspace.ploidy_j_k
@@ -409,20 +465,6 @@ class PloidyModel(GeneralizedContinuousModel):
                    # tt.maximum(ploidy_j_k[j][np.newaxis, :], error_rate_j[j])
                    for j in range(num_contigs)]
 
-        psi_js = Exponential(name='psi_js',
-                             lam=1.0 / psi_scale,
-                             shape=(num_contigs, num_samples))
-        register_as_sample_specific(psi_js, sample_axis=1)
-        alpha_js = pm.Deterministic('alpha_js', tt.inv((tt.exp(psi_js) - 1.0 + eps)))
-
-        def bound(logp, *conditions, **kwargs):
-            broadcast_conditions = kwargs.get('broadcast_conditions', True)
-            if broadcast_conditions:
-                alltrue = pm_dist_math.alltrue_elemwise
-            else:
-                alltrue = pm_dist_math.alltrue_scalar
-            return tt.switch(alltrue(conditions), logp, 0)
-
         # def negative_binomial_logp(mu, alpha, value, mask=True):
         #     return bound(pm_dist_math.factln(value + alpha - 1) - pm_dist_math.factln(alpha - 1)
         #                  + pm_dist_math.logpow(mu / (mu + alpha), value)
@@ -432,25 +474,14 @@ class PloidyModel(GeneralizedContinuousModel):
         # logp_j_skm = [negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
         #                                      alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
         #                                      value=counts_m[np.newaxis, np.newaxis, :],
-        #                                      mask=hist_sjm_mask[:, j, np.newaxis, :])
+        #                                      mask=hist_mask_sjm[:, j, np.newaxis, :])
         #               for j in range(num_contigs)]
 
-        def negative_binomial_logp(mu, alpha, value, mask=True):
-            return bound(pm_dist_math.factln(value + alpha - 1) - pm_dist_math.factln(alpha - 1) - pm_dist_math.factln(value)
-                                      + pm_dist_math.logpow(mu / (mu + alpha), value)
-                                      + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
-                                      mu > 0, value >= 0, alpha > 0, mask)
-
-        def poisson_logp(mu, value, mask=True):
-            log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu >= 0, value >= 0, mask)
-            # Return zero when mu and value are both zero
-            return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)
-
-        num_occurrences_sj = np.sum(self.ploidy_workspace.hist_sjm_full * hist_sjm_mask, axis=-1)
+        num_occurrences_sj = np.sum(self.ploidy_workspace.hist_sjm_full * hist_mask_sjm, axis=-1)
         p_j_skm = [tt.exp(negative_binomial_logp(mu=mu_j_sk[j].dimshuffle(0, 1, 'x') + eps,
                                                  alpha=alpha_js[j].dimshuffle(0, 'x', 'x'),
                                                  value=counts_m[np.newaxis, np.newaxis, :],
-                                                 mask=hist_sjm_mask[:, j, np.newaxis, :]))
+                                                 mask=hist_mask_sjm[:, j, np.newaxis, :]))
                    for j in range(num_contigs)]
         [pm.Deterministic('hist_%d_skm' % j,
                           var=num_occurrences_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps)
@@ -459,10 +490,10 @@ class PloidyModel(GeneralizedContinuousModel):
         def _logp_hist(_hist_sjm):
             logp_hist_j_skm = [poisson_logp(mu=num_occurrences_sj[:, j, np.newaxis, np.newaxis] * p_j_skm[j] + eps,
                                             value=_hist_sjm[:, j, :].dimshuffle(0, 'x', 1),
-                                            mask=hist_sjm_mask[:, j, np.newaxis, :])
+                                            mask=hist_mask_sjm[:, j, np.newaxis, :])
                                for j in range(num_contigs)]
             return tt.stack([tt.sum(log_ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + \
-                                    tt.sum(hist_sjm_mask[:, contig_to_index_map[contig], np.newaxis, :] * \
+                                    tt.sum(hist_mask_sjm[:, contig_to_index_map[contig], np.newaxis, :] * \
                                            pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] + eps) + logp_hist_j_skm[contig_to_index_map[contig]], axis=1)))
                     for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
             # return tt.stack([tt.sum(log_ploidy_state_priors_i_k[i][np.newaxis, :, np.newaxis] + \
