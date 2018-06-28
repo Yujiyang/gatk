@@ -524,22 +524,37 @@ task shadowTestJar(type: ShadowJar){
     classifier = "testDependencies"
 }
 
-task unpackJar(type: Copy){
+task unpackTestJar(type: Copy){
     String testClassesJar = "$System.env.TEST_JAR"
-    print testClassesJar
 
     if (testClassesJar != null){
         from zipTree(testClassesJar)
         into "testClasses"
     }
+
+    doFirst {
+        if (testClassesJar == null) {
+            throw new GradleException("Environment variable 'TEST_JAR' not specified")
+        }
+        logger.lifecycle("unpacking test jar: " + testClassesJar)
+    }
 }
 
-task testOnShadowJar(type: Test){
+task testOnPackagedReleaseJar(type: Test){
     String testClassesJar = "$System.env.TEST_JAR"
     String testDependencyJar = "$System.env.TEST_DEPENDENCY_JAR"
     String gatkJar = "$System.env.GATK_JAR"
 
-    dependsOn unpackJar
+    dependsOn unpackTestJar
+
+    doFirst {
+        if (testDependencyJar == null) {
+            throw new GradleException("Environment variable 'TEST_DEPENDENCY_JAR' not specified")
+        }
+        if (gatkJar == null) {
+            throw new GradleException("Environment variable 'GATK_JAR' not specified")
+        }
+    }
 
     outputs.upToDateWhen { false }  //tests will never be "up to date" so you can always rerun them
     String TEST_VERBOSITY = "$System.env.TEST_VERBOSITY"
@@ -682,11 +697,11 @@ jacocoTestReport {
     }
 }
 
-task jacocoTestReportOnShadowJar(type: JacocoReport) {
+task jacocoTestReportOnPackagedReleaseJar(type: JacocoReport) {
     String sourceFiles = "$System.env.SOURCE_DIR"
 
-    dependsOn testOnShadowJar
-    executionData testOnShadowJar
+    dependsOn testOnPackagedReleaseJar
+    executionData testOnPackagedReleaseJar
     sourceSets {
         jacocoTestReportOnShadowJar {
             java {
