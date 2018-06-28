@@ -114,7 +114,7 @@ else
 fi
 ./gradlew clean collectBundleIntoDir shadowTestClassJar shadowTestJar -Drelease=$DRELEASE
 ZIPPATHGATK=$( find ./build -name "*bundle-files-collected" )
-mv -j ${ZIPPATHGATK} -d ./unzippedJar
+mv ${ZIPPATHGATK} ./unzippedJar
 ZIPPATHPYTHON=$( find ./unzippedJar -name "gatkPython*.zip" )
 unzip -o -j ${ZIPPATHPYTHON} -d ./unzippedJar/scripts
 rm ${ZIPPATHPYTHON}
