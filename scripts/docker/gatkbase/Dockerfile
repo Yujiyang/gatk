@@ -9,16 +9,16 @@ RUN apt-get update && \
     apt-get install -y wget \
     curl \
     unzip \
-    gcc \
-    python-dev \
-    python-setuptools \
+#    gcc \
+#    python-dev \
+#    python-setuptools \
     less \
-    aufs-tools \
-    automake \
+#    aufs-tools \
+#    automake \
     bedtools \
-    btrfs-tools \
-    build-essential \
-    dpkg-sig \
+#    btrfs-tools \
+#    build-essential \
+#    dpkg-sig \
     samtools \
     openjdk-8-jre \
     software-properties-common && \
@@ -61,4 +61,5 @@ RUN apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E084DAB9 && \
 
 COPY install_R_packages.R install_R_packages.R
 RUN Rscript install_R_packages.R
+# Deleting unneeded caches
 RUN rm -rf /var/lib/apt/lists/*
