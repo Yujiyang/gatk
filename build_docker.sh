@@ -113,9 +113,9 @@ else
     RELEASE=false
 fi
 ./gradlew clean collectBundleIntoDir shadowTestClassJar shadowTestJar -Drelease=$DRELEASE
-ZIPPATHGATK=$( find ./build -name "gatk-*.zip" )
-ZIPPATHPYTHON=$( find ./unzippedJar -name "gatkPython*.zip" )
+ZIPPATHGATK=$( find ./build -name "*bundle-files-collected" )
 mv -j ${ZIPPATHGATK} -d ./unzippedJar
+ZIPPATHPYTHON=$( find ./unzippedJar -name "gatkPython*.zip" )
 unzip -o -j ${ZIPPATHPYTHON} -d ./unzippedJar/scripts
 rm ${ZIPPATHPYTHON}
 
