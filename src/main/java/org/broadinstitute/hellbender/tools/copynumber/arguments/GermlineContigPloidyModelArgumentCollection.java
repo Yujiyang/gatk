@@ -99,7 +99,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
             minValue = 0.,
             optional = true
     )
-    private double mosaicismBiasScale = 0.05;
+    private double mosaicismBiasScale = 0.01;
 
     @Argument(
             doc = "Inverse mean of the exponential prior on the per-sample unexplained variance.",

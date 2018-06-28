@@ -166,14 +166,17 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             axarr[1].set_xticklabels(self.ploidy_workspace.contigs)
             axarr[1].set_xlabel('contig', size=14)
             axarr[1].set_ylabel('ploidy', size=14)
+            axarr[1].set_ylim([0, np.shape(q_ploidy_sjl)[2]])
 
+            axarr[2].axhline(1, c='k', ls='dashed')
             axarr[2].errorbar(j, np.ones(self.ploidy_workspace.num_contigs), yerr=fit_mu_sd_sj[s] / fit_mu_sj[s], c='g', fmt='o', elinewidth=2)
-            axarr[2].scatter(j, mu_j, c='r')
+            axarr[2].scatter(j, mu_j / fit_mu_sj[s], c='r')
             axarr[2].set_xticks(j)
             axarr[2].set_xticklabels(self.ploidy_workspace.contigs)
             axarr[2].set_xlabel('contig', size=14)
             axarr[2].set_ylabel('mu fit', size=14)
 
+            axarr[3].axhline(1, c='k', ls='dashed')
             axarr[3].errorbar(j, np.ones(self.ploidy_workspace.num_contigs), yerr=fit_alpha_sd_sj[s] / fit_alpha_sj[s], c='g', fmt='o', elinewidth=2)
             axarr[3].scatter(j, alpha_js[:, s] / fit_alpha_sj[s], c='r')
             axarr[3].set_xticks(j)
@@ -181,6 +184,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             axarr[3].set_xlabel('contig', size=14)
             axarr[3].set_ylabel('alpha fit', size=14)
 
+            axarr[4].axhline(0, c='k', ls='dashed')
             axarr[4].scatter(j, f_sj[s, :], c='r')
             axarr[4].set_xticks(j)
             axarr[4].set_xticklabels(self.ploidy_workspace.contigs)
