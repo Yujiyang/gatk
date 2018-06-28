@@ -9,6 +9,8 @@ import theano.tensor as tt
 import pymc3.distributions.dist_math as pm_dist_math
 from pymc3 import Cauchy, Normal, Deterministic, DensityDist, Dirichlet, Bound, Uniform, NegativeBinomial, Poisson, Gamma, Exponential, Potential
 from typing import List, Dict, Set, Tuple
+from scipy.stats import nbinom
+import matplotlib.pyplot as plt
 
 from . import commons
 from .fancy_model import GeneralizedContinuousModel
@@ -236,11 +238,6 @@ class PloidyWorkspace:
         self.counts_m = np.arange(self.num_counts, dtype=types.med_uint)
 
         # mask for count bins
-        # mask_percentile = 40
-        # hist_sjm_masked = np.ma.masked_where(self.hist_sjm_full == 0, self.hist_sjm_full)
-        # hist_sjm_masked = np.ma.filled(hist_sjm_masked.astype(float), np.nan)
-        # hist_cutoff_sj = np.nanpercentile(hist_sjm_masked, mask_percentile, axis=-1)
-        # self.hist_mask_sjm = self.hist_sjm_full > hist_cutoff_sj[:, :, np.newaxis]
         self.hist_mask_sjm = self._construct_mask(self.hist_sjm_full)
 
         self.fit_mu_sj, self.fit_mu_sd_sj, self.fit_alpha_sj, self.fit_alpha_sd_sj = \
@@ -261,6 +258,53 @@ class PloidyWorkspace:
         self.log_ploidy_emission_sjl: types.TensorSharedVariable = \
             th.shared(np.zeros((self.num_samples, self.num_contigs, self.num_ploidies), dtype=types.floatX),
                       name='log_ploidy_emission_sjl', borrow=config.borrow_numpy)
+
+        for s in range(self.num_samples):
+            fig, axarr = plt.subplots(5, 1, figsize=(12, 12), gridspec_kw = {'height_ratios':[4, 1, 1, 1, 1]})
+            for i, contig_tuple in enumerate(self.contig_tuples):
+                for contig in contig_tuple:
+                    j = self.contig_to_index_map[contig]
+                    counts_m_masked = self.counts_m[self.hist_mask_sjm[s, j]]
+                    hist_norm_m = self.hist_sjm_full[s, j] / np.sum(self.hist_sjm_full[s, j] * self.hist_mask_sjm[s, j])
+                    axarr[0].semilogy(hist_norm_m, c='b', alpha=0.25)
+                    axarr[0].semilogy(counts_m_masked, hist_norm_m[counts_m_masked], c='b', alpha=0.5)
+                    mu = self.fit_mu_sj[s, j]
+                    alpha = self.fit_alpha_sj[s, j]
+                    pdf_m = nbinom.pmf(k=counts_m_masked, n=alpha, p=alpha / (mu + alpha))
+                    axarr[0].semilogy(counts_m_masked, pdf_m, c='g', lw=2)
+                    axarr[0].set_xlim([0, self.num_counts])
+            axarr[0].set_ylim([1 / np.max(np.sum(self.hist_sjm_full[s] * self.hist_mask_sjm[s], axis=-1)), 1E-1])
+            axarr[0].set_xlabel('count', size=14)
+            axarr[0].set_ylabel('density', size=14)
+
+            j = np.arange(self.num_contigs)
+
+            axarr[1].set_xticks(j)
+            axarr[1].set_xticklabels(self.contigs)
+            axarr[1].set_xlabel('contig', size=14)
+            axarr[1].set_ylabel('ploidy', size=14)
+
+            axarr[2].axhline(1, c='k', ls='dashed')
+            axarr[2].set_xticks(j)
+            axarr[2].set_xticklabels(self.contigs)
+            axarr[2].set_xlabel('contig', size=14)
+            axarr[2].set_ylabel('mu fit', size=14)
+
+            axarr[3].axhline(1, c='k', ls='dashed')
+            axarr[3].set_xticks(j)
+            axarr[3].set_xticklabels(self.contigs)
+            axarr[3].set_xlabel('contig', size=14)
+            axarr[3].set_ylabel('alpha fit', size=14)
+
+            axarr[4].axhline(0, c='k', ls='dashed')
+            axarr[4].set_xticks(j)
+            axarr[4].set_xticklabels(self.contigs)
+            axarr[4].set_xlabel('contig', size=14)
+            axarr[4].set_ylabel('mosaicism', size=14)
+            axarr[4].set_ylim([self.ploidy_config.mosaicism_bias_lower_bound, self.ploidy_config.mosaicism_bias_upper_bound])
+
+            fig.tight_layout(pad=0.5)
+            fig.savefig('/home/slee/working/gatk/test_files/plots/sample_{0}.png'.format(s))
 
     @staticmethod
     def _get_contig_set_from_interval_list(interval_list: List[Interval]) -> Set[str]:
@@ -293,7 +337,7 @@ class PloidyWorkspace:
         #                 break
         mask_sjm = np.full(np.shape(hist_sjm), True)
         mask_sjm[hist_sjm < 10] = False
-        # mask_sjm[:, :, 0] = False
+        mask_sjm[:, :, 0] = False
         return mask_sjm
 
     @staticmethod
@@ -339,6 +383,9 @@ class PloidyWorkspace:
         fit_mu_sd_sj = np.std(trace['fit_mu_sj'], axis=0)
         fit_alpha_sj = np.mean(trace['fit_alpha_sj'], axis=0)
         fit_alpha_sd_sj = np.std(trace['fit_alpha_sj'], axis=0)
+
+        print(fit_mu_sj)
+        print(fit_alpha_sj)
 
         return fit_mu_sj, fit_mu_sd_sj, fit_alpha_sj, fit_alpha_sd_sj
 
@@ -537,9 +584,9 @@ def negative_binomial_logp(mu, alpha, value, mask=True):
     return bound(pm_dist_math.binomln(value + alpha - 1, value)
                  + pm_dist_math.logpow(mu / (mu + alpha), value)
                  + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
-                 mu > 0, value >= 0, alpha > 0, mask)
+                 mu > 0, value > 0, alpha > 0, mask)
 
 def poisson_logp(mu, value, mask=True):
-    log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu >= 0, value >= 0, mask)
+    log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu > 0, value > 0, mask)
     # Return zero when mu and value are both zero
     return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)

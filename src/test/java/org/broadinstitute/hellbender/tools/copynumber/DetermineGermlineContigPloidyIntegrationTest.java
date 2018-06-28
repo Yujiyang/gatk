@@ -290,7 +290,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         SFARI_COUNT_FILES.forEach(argsBuilder::addInput);
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors_hg19.tsv"))
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
-                .addArgument(StandardArgumentDefinitions.INTERVALS_LONG_NAME, "/home/slee/working/gatk/test_files/NimbleGenEZ2Tiled_hg19_v2.preprocessed.mapp_gt_0.99.0.4_lt_gc_lt_0.6.interval_list")
+                .addArgument(StandardArgumentDefinitions.INTERVALS_LONG_NAME, "/home/slee/working/gatk/test_files/NimbleGenEZ2Tiled_hg19_v2.preprocessed.mapp_gt_0.99.interval_list")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-sfari-cohort")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "500")
                 .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.1")
@@ -306,7 +306,7 @@ public final class DetermineGermlineContigPloidyIntegrationTest extends CommandL
         SFARI_COUNT_FILES.forEach(argsBuilder::addInput);
         argsBuilder.addFileArgument(DetermineGermlineContigPloidy.PLOIDY_STATE_PRIORS_FILE_LONG_NAME, new File("/home/slee/working/gatk/test_files/ploidy_state_priors_hg19_full.tsv"))
                 .addArgument(StandardArgumentDefinitions.OUTPUT_LONG_NAME, "/home/slee/working/gatk/test_files")
-//                .addArgument(StandardArgumentDefinitions.INTERVALS_LONG_NAME, "/home/slee/working/gatk/test_files/NimbleGenEZ2Tiled_hg19_v2.preprocessed.mapp_gt_0.99.0.4_lt_gc_lt_0.6.interval_list")
+                .addArgument(StandardArgumentDefinitions.INTERVALS_LONG_NAME, "/home/slee/working/gatk/test_files/NimbleGenEZ2Tiled_hg19_v2.preprocessed.mapp_gt_0.99.interval_list")
                 .addArgument(CopyNumberStandardArgument.OUTPUT_PREFIX_LONG_NAME, "test-sfari-cohort-full")
                 .addArgument(DetermineGermlineContigPloidy.MAXIMUM_COUNT_LONG_NAME, "500")
                 .addArgument(GermlineContigPloidyModelArgumentCollection.PSI_SCALE_LONG_NAME, "0.1")

@@ -142,7 +142,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                 for contig in contig_tuple:
                     j = self.ploidy_workspace.contig_to_index_map[contig]
                     counts_m_masked = self.ploidy_workspace.counts_m[self.ploidy_workspace.hist_mask_sjm[s, j]]
-                    hist_norm_m = self.ploidy_workspace.hist_sjm_full[s, j] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j])
+                    hist_norm_m = self.ploidy_workspace.hist_sjm_full[s, j] / np.sum(self.ploidy_workspace.hist_sjm_full[s, j] * self.ploidy_workspace.hist_mask_sjm[s, j])
                     axarr[0].semilogy(hist_norm_m, c='b', alpha=0.25)
                     axarr[0].semilogy(counts_m_masked, hist_norm_m[counts_m_masked], c='b', alpha=0.5)
                     mu = fit_mu_sj[s, j]
@@ -150,7 +150,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                     pdf_m = nbinom.pmf(k=counts_m_masked, n=alpha, p=alpha / (mu + alpha))
                     axarr[0].semilogy(counts_m_masked, pdf_m, c='g', lw=2)
                     axarr[0].set_xlim([0, self.ploidy_workspace.num_counts])
-                    axarr[0].set_ylim([1 / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]), 2 * np.max(hist_norm_m)])
+            axarr[0].set_ylim([1 / np.max(np.sum(self.ploidy_workspace.hist_sjm_full[s] * self.ploidy_workspace.hist_mask_sjm[s], axis=-1)), 1E-1])
             axarr[0].set_xlabel('count', size=14)
             axarr[0].set_ylabel('density', size=14)
 
