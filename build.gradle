@@ -538,6 +538,8 @@ task testOnPackagedReleaseJar(type: Test){
     String testDependencyJar = "$System.env.TEST_DEPENDENCY_JAR"
     String gatkJar = "$System.env.GATK_JAR"
 
+    description = "A test task intended to be run on the release jar inside the docker image of gatk with dependencies provided as volumes"
+
     dependsOn unpackTestJar
 
     doFirst {
@@ -550,6 +552,7 @@ task testOnPackagedReleaseJar(type: Test){
         if (testClassesJar == "null") {
             throw new GradleException("Environment variable 'TEST_JAR' not specified")
         }
+        lifeycle.logger("Test classpath used: " + classpath)
     }
 
     testClassesDir = file("testClasses")
@@ -613,6 +616,7 @@ jacocoTestReport {
     }
 }
 
+//he
 task jacocoTestReportOnPackagedReleaseJar(type: JacocoReport) {
     String sourceFiles = "$System.env.SOURCE_DIR"
 
