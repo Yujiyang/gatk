@@ -117,7 +117,6 @@ ZIPPATHGATK=$( find ./build -name "*bundle-files-collected" )
 mv ${ZIPPATHGATK} ./unzippedJar
 ZIPPATHPYTHON=$( find ./unzippedJar -name "gatkPython*.zip" )
 unzip -o -j ${ZIPPATHPYTHON} -d ./unzippedJar/scripts
-rm ${ZIPPATHPYTHON}
 
 mkdir ${STAGING_ABSOLUTE_PATH:-.}/testJars
 mv $( find ./build/libs/ -name "gatk*test.jar" ) ${STAGING_ABSOLUTE_PATH:-.}/testJars
