@@ -112,11 +112,12 @@ if [ -n "${IS_PUSH}" ]; then
 else
     RELEASE=false
 fi
-./gradlew clean bundle pythonPackageArchive shadowTestClassJar shadowTestJar -Drelease=$DRELEASE
+./gradlew clean collectBundleIntoDir shadowTestClassJar shadowTestJar -Drelease=$DRELEASE
 ZIPPATHGATK=$( find ./build -name "gatk-*.zip" )
-ZIPPATHPYTHON=$( find ./build -name "gatkPython*.zip" )
-unzip -j ${ZIPPATHGATK} -d ./unzippedJar
+ZIPPATHPYTHON=$( find ./unzippedJar -name "gatkPython*.zip" )
+mv -j ${ZIPPATHGATK} -d ./unzippedJar
 unzip -o -j ${ZIPPATHPYTHON} -d ./unzippedJar/scripts
+rm ${ZIPPATHPYTHON}
 
 mkdir ${STAGING_ABSOLUTE_PATH:-.}/testJars
 mv $( find ./build/libs/ -name "gatk*test.jar" ) ${STAGING_ABSOLUTE_PATH:-.}/testJars
