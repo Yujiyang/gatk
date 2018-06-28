@@ -6,14 +6,19 @@ FROM ubuntu:16.04
 RUN apt-get update && \
     apt-get upgrade -y && \
     apt-get install -y python && \
-    apt-get install -y wget curl unzip gcc python-dev python-setuptools git less \
+    apt-get install -y wget \
+    curl \
+    unzip \
+    gcc \
+    python-dev \
+    python-setuptools \
+    less \
     aufs-tools \
     automake \
     bedtools \
     btrfs-tools \
     build-essential \
     dpkg-sig \
-    iptables \
     samtools \
     openjdk-8-jre \
     software-properties-common && \

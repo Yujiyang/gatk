@@ -552,7 +552,8 @@ task testOnPackagedReleaseJar(type: Test){
         if (testClassesJar == "null") {
             throw new GradleException("Environment variable 'TEST_JAR' not specified")
         }
-        lifeycle.logger("Test classpath used: " + classpath)
+        logger.lifecycle("The classpath used for this test:")
+        classpath.each( logger.lifecycle(it.toString()))
     }
 
     testClassesDir = file("testClasses")
@@ -616,14 +617,17 @@ jacocoTestReport {
     }
 }
 
-//he
+// Task intended to collect coverage data from testOnPackagedReleaseJar executed inside the docker image
+// the classpath for these tests is set at execution time for testOnPackagedReleaseJar
 task jacocoTestReportOnPackagedReleaseJar(type: JacocoReport) {
     String sourceFiles = "$System.env.SOURCE_DIR"
 
     dependsOn testOnPackagedReleaseJar
     executionData testOnPackagedReleaseJar
+
+    // This must be here to overwrite the project default srcDir
     sourceSets {
-        jacocoTestReportOnShadowJar {
+        jacocoTestReportOnPackagedReleaseJar {
             java {
                 srcDir sourceFiles
             }
@@ -637,7 +641,7 @@ task jacocoTestReportOnPackagedReleaseJar(type: JacocoReport) {
     classDirectories =  files("testClasses")
 
     group = "Reporting"
-    description = "Generate Jacoco coverage reports after running tests."
+    description = "Generate Jacoco coverage reports after running tests inside the docker image."
 
     reports {
         xml.enabled = true

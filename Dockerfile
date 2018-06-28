@@ -30,7 +30,7 @@ RUN echo "source activate gatk" > /root/run_unit_tests.sh && \
     echo "export TEST_DEPENDENCY_JAR=\$( find /jars -name \"gatk*testDependencies.jar\" )" >> /root/run_unit_tests.sh && \
     echo "export GATK_JAR=$( find /gatk -name "gatk*local.jar" )" >> /root/run_unit_tests.sh && \
     echo "export SOURCE_DIR=/gatkCloneMountPoint/src/main/java" >> /root/run_unit_tests.sh && \
-    echo "cd /gatk/ && /gatksrc/gradlew testOnPackagedReleaseJar jacocoTestReportOnPackagedReleaseJar --offline -g /root -a -p /gatksrc" >> /root/run_unit_tests.sh
+    echo "cd /gatk/ && /gatkCloneMountPoint/gradlew testOnPackagedReleaseJar jacocoTestReportOnPackagedReleaseJar --offline -g /root -a -p /gatkCloneMountPoint" >> /root/run_unit_tests.sh
 
 WORKDIR /root
 RUN cp -r /root/run_unit_tests.sh /gatk
