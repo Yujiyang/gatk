@@ -7,10 +7,8 @@ import pymc3 as pm
 import theano as th
 import theano.tensor as tt
 import pymc3.distributions.dist_math as pm_dist_math
-from pymc3 import Normal, Deterministic, DensityDist, Dirichlet, Bound, Uniform, NegativeBinomial, Poisson, Gamma, Exponential
+from pymc3 import Cauchy, Normal, Deterministic, DensityDist, Dirichlet, Bound, Uniform, NegativeBinomial, Poisson, Gamma, Exponential, Potential
 from typing import List, Dict, Set, Tuple
-import matplotlib.pyplot as plt
-from scipy.stats import nbinom
 
 from . import commons
 from .fancy_model import GeneralizedContinuousModel
@@ -204,8 +202,6 @@ class PloidyWorkspace:
         self.ploidy_state_priors_i_k: List[np.ndarray] = \
             [np.array(list(self.ploidy_config.ploidy_state_priors_map[contig_tuple].values()))
              for contig_tuple in self.contig_tuples]
-        self.log_ploidy_state_priors_i_k: List[np.ndarray] = \
-            [np.log(ploidy_state_priors_k + self.eps) for ploidy_state_priors_k in self.ploidy_state_priors_i_k]
         self.ploidy_j_k: List[np.ndarray] = []
         self.contigs: List[str] = []
         for i, contig_tuple in enumerate(self.contig_tuples):
@@ -396,7 +392,6 @@ class PloidyModel(GeneralizedContinuousModel):
         hist_sjm = ploidy_workspace.hist_sjm
         hist_mask_sjm = ploidy_workspace.hist_mask_sjm
         ploidy_state_priors_i_k = ploidy_workspace.ploidy_state_priors_i_k
-        log_ploidy_state_priors_i_k = ploidy_workspace.log_ploidy_state_priors_i_k
         ploidy_j_k = ploidy_workspace.ploidy_j_k
         is_ploidy_in_ploidy_state_j_kl = ploidy_workspace.is_ploidy_in_ploidy_state_j_kl
         d_s_testval = ploidy_workspace.d_s_testval
@@ -408,7 +403,7 @@ class PloidyModel(GeneralizedContinuousModel):
         d_s = Uniform('d_s',
                       upper=depth_upper_bound,
                       shape=num_samples,
-                      testval=100)#d_s_testval)
+                      testval=d_s_testval)
         register_as_sample_specific(d_s, sample_axis=0)
 
         b_j = Bound(Gamma,
@@ -420,10 +415,11 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_global(b_j)
         b_j_norm = Deterministic('b_j_norm', var=b_j / tt.mean(b_j))
 
-        f_js = Bound(Normal,
+        f_js = Bound(Cauchy,
                      lower=mosaicism_bias_lower_bound,
                      upper=mosaicism_bias_upper_bound)('f_js',
-                                                       sd=mosaicism_bias_scale,
+                                                       alpha=0.,
+                                                       beta=mosaicism_bias_scale,
                                                        shape=(num_contigs, num_samples))
         register_as_sample_specific(f_js, sample_axis=1)
 
@@ -456,21 +452,17 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_sample_specific(psi_js, sample_axis=1)
         alpha_js = pm.Deterministic('alpha_js', tt.inv((tt.exp(psi_js) - 1.0 + eps)))
 
-        def logp(negative_binomial_fit):
-            mu_sj = negative_binomial_fit[0]
-            mu_sd_sj = negative_binomial_fit[1]
-            alpha_sj = negative_binomial_fit[2]
-            alpha_sd_sj = negative_binomial_fit[3]
-            logp_j_sk = [Gamma.dist(mu=mu_sj[:, j, np.newaxis],
-                                    sd=mu_sd_sj[:, j, np.newaxis]).logp(mu_j_sk[j] + eps) +
-                         Gamma.dist(mu=alpha_sj[:, j, np.newaxis],
-                                    sd=alpha_sd_sj[:, j, np.newaxis]).logp(alpha_js[j, :, np.newaxis] + eps)
-                         for j in range(num_contigs)]
-            return tt.sum([pm.logsumexp(tt.log(pi_i_sk[i] + eps) +
-                                        tt.sum([logp_j_sk[contig_to_index_map[contig]]
-                                                for contig in contig_tuple], axis=0),
-                                        axis=1)
-                           for i, contig_tuple in enumerate(contig_tuples) ])
+        logp_j_sk = [Gamma.dist(mu=self.ploidy_workspace.fit_mu_sj[:, j, np.newaxis],
+                                sd=self.ploidy_workspace.fit_mu_sd_sj[:, j, np.newaxis]).logp(mu_j_sk[j] + eps) +
+                     Gamma.dist(mu=self.ploidy_workspace.fit_alpha_sj[:, j, np.newaxis],
+                                sd=self.ploidy_workspace.fit_alpha_sd_sj[:, j, np.newaxis]).logp(alpha_js[j, :, np.newaxis] + eps)
+                     for j in range(num_contigs)]
+
+        Potential('logp', tt.sum([pm.logsumexp(tt.log(pi_i_sk[i] + eps) +
+                                               tt.sum([logp_j_sk[contig_to_index_map[contig]]
+                                                       for contig in contig_tuple], axis=0),
+                                               axis=1)
+                                  for i, contig_tuple in enumerate(contig_tuples)]))
             # return tt.sum([log_ploidy_state_priors_i_k[i][np.newaxis, :] + \
             #                  tt.sum([pm.logsumexp(tt.log(pi_i_sk[i] + eps) + logp_j_sk[contig_to_index_map[contig]], axis=1)
             #                          for contig in contig_tuple], axis=0)
@@ -479,15 +471,12 @@ class PloidyModel(GeneralizedContinuousModel):
             #                         pm.logsumexp(tt.log(pi_i_sk[i] + eps) + logp_j_sk[contig_to_index_map[contig]], axis=1))
             #                  for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
-        DensityDist(name='logp', logp=logp, observed=[self.ploidy_workspace.fit_mu_sj,
-                                                      self.ploidy_workspace.fit_mu_sd_sj,
-                                                      self.ploidy_workspace.fit_alpha_sj,
-                                                      self.ploidy_workspace.fit_alpha_sd_sj])
 
         pm.Deterministic(name='log_ploidy_emission_sjl',
-                         var=tt.stack([
-                             tt.log(tt.dot(pi_i_sk[i], is_ploidy_in_ploidy_state_j_kl[contig_to_index_map[contig]]) + eps)
-                             for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]).dimshuffle(1, 0, 2))
+                         var=tt.stack([pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[contig_to_index_map[contig]] + eps) +
+                                                    logp_j_sk[contig_to_index_map[contig]][:, :, np.newaxis],
+                                                    axis=1)[:, 0, :]
+                                       for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]).dimshuffle(1, 0, 2))
 
 
 class PloidyEmissionBasicSampler:

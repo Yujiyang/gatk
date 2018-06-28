@@ -116,6 +116,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                    for i in range(self.ploidy_workspace.num_contig_tuples)]
         d_s = np.mean(trace['d_s'], axis=0)
         b_j_norm = np.mean(trace['b_j_norm'], axis=0)
+        f_sj = np.transpose(np.mean(trace['f_js'], axis=0))
         mu_j_sk = [np.mean(trace['mu_%d_sk' % j], axis=0)
                    for j in range(self.ploidy_workspace.num_contigs)]
         alpha_js = np.mean(trace['alpha_js'], axis=0)
@@ -135,7 +136,8 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
         for s, q_ploidy_jl in enumerate(q_ploidy_sjl):
             print('sample_{0}:'.format(s), np.argmax(q_ploidy_jl, axis=1))
         for s in range(self.ploidy_workspace.num_samples):
-            fig, axarr = plt.subplots(3, 1, figsize=(12, 8))
+            l_j = np.argmax(q_ploidy_sjl[s], axis=1)
+            fig, axarr = plt.subplots(5, 1, figsize=(20, 8))
             for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples):
                 for contig in contig_tuple:
                     j = self.ploidy_workspace.contig_to_index_map[contig]
@@ -158,19 +160,33 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             mu_j = [mu_j_sk[j][s, k_j[j]] for j in range(self.ploidy_workspace.num_contigs)]
 
             j = np.arange(self.ploidy_workspace.num_contigs)
-            axarr[1].errorbar(j, fit_mu_sj[s], yerr=fit_mu_sd_sj[s], c='g', fmt='o', elinewidth=2)
-            axarr[1].scatter(j, mu_j, c='r')
+
+            axarr[1].scatter(j, l_j, c='r')
             axarr[1].set_xticks(j)
             axarr[1].set_xticklabels(self.ploidy_workspace.contigs)
-            axarr[2].set_xlabel('contig', size=14)
-            axarr[1].set_ylabel('mu', size=14)
+            axarr[1].set_xlabel('contig', size=14)
+            axarr[1].set_ylabel('ploidy', size=14)
 
-            axarr[2].errorbar(j, fit_alpha_sj[s], yerr=fit_alpha_sd_sj[s], c='g', fmt='o', elinewidth=2)
-            axarr[2].scatter(j, alpha_js[:, s], c='r')
+            axarr[2].errorbar(j, np.ones(self.ploidy_workspace.num_contigs), yerr=fit_mu_sd_sj[s] / fit_mu_sj[s], c='g', fmt='o', elinewidth=2)
+            axarr[2].scatter(j, mu_j, c='r')
             axarr[2].set_xticks(j)
             axarr[2].set_xticklabels(self.ploidy_workspace.contigs)
             axarr[2].set_xlabel('contig', size=14)
-            axarr[2].set_ylabel('alpha', size=14)
+            axarr[2].set_ylabel('mu fit', size=14)
 
-            fig.tight_layout(pad=0.2)
+            axarr[3].errorbar(j, np.ones(self.ploidy_workspace.num_contigs), yerr=fit_alpha_sd_sj[s] / fit_alpha_sj[s], c='g', fmt='o', elinewidth=2)
+            axarr[3].scatter(j, alpha_js[:, s] / fit_alpha_sj[s], c='r')
+            axarr[3].set_xticks(j)
+            axarr[3].set_xticklabels(self.ploidy_workspace.contigs)
+            axarr[3].set_xlabel('contig', size=14)
+            axarr[3].set_ylabel('alpha fit', size=14)
+
+            axarr[4].scatter(j, f_sj[s, :], c='r')
+            axarr[4].set_xticks(j)
+            axarr[4].set_xticklabels(self.ploidy_workspace.contigs)
+            axarr[4].set_xlabel('contig', size=14)
+            axarr[4].set_ylabel('mosaicism', size=14)
+            axarr[4].set_ylim([self.ploidy_config.mosaicism_bias_lower_bound, self.ploidy_config.mosaicism_bias_upper_bound])
+
+            fig.tight_layout(pad=0.5)
             fig.savefig('/home/slee/working/gatk/test_files/plots/sample_{0}.png'.format(s))
