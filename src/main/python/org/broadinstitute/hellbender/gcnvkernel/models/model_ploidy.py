@@ -251,7 +251,7 @@ class PloidyWorkspace:
             self._fit_negative_binomial(self.hist_sjm_full, self.hist_mask_sjm)
 
         average_ploidy = 2. # TODO
-        self.d_s_testval = np.median(np.sum(self.hist_sjm_full * np.arange(self.num_counts), axis=-1) / np.sum(self.hist_sjm_full, axis=-1), axis=-1) / average_ploidy
+        self.d_s_testval = np.median(np.sum(self.hist_sjm_full * self.hist_mask_sjm * self.counts_m, axis=-1) / np.sum(self.hist_sjm_full * self.hist_mask_sjm, axis=-1), axis=-1) / average_ploidy
 
         self.hist_sjm : types.TensorSharedVariable = \
             th.shared(self.hist_sjm_full, name='hist_sjm', borrow=config.borrow_numpy)
@@ -296,8 +296,8 @@ class PloidyWorkspace:
         #             else:
         #                 break
         mask_sjm = np.full(np.shape(hist_sjm), True)
-        # mask_sjm[hist_sjm < 10] = False
-        mask_sjm[:, :, 0] = False
+        mask_sjm[hist_sjm < 10] = False
+        # mask_sjm[:, :, 0] = False
         return mask_sjm
 
     @staticmethod
@@ -408,7 +408,7 @@ class PloidyModel(GeneralizedContinuousModel):
         d_s = Uniform('d_s',
                       upper=depth_upper_bound,
                       shape=num_samples,
-                      testval=d_s_testval)
+                      testval=100)#d_s_testval)
         register_as_sample_specific(d_s, sample_axis=0)
 
         b_j = Bound(Gamma,
@@ -461,14 +461,23 @@ class PloidyModel(GeneralizedContinuousModel):
             mu_sd_sj = negative_binomial_fit[1]
             alpha_sj = negative_binomial_fit[2]
             alpha_sd_sj = negative_binomial_fit[3]
-            logp_j_sk = [Normal.dist(mu=mu_sj[:, j, np.newaxis],
-                                     sd=mu_sd_sj[:, j, np.newaxis]).logp(mu_j_sk[j]) +
-                         Normal.dist(mu=alpha_sj[:, j, np.newaxis],
-                                     sd=alpha_sd_sj[:, j, np.newaxis]).logp(alpha_js[j, :, np.newaxis])
+            logp_j_sk = [Gamma.dist(mu=mu_sj[:, j, np.newaxis],
+                                    sd=mu_sd_sj[:, j, np.newaxis]).logp(mu_j_sk[j] + eps) +
+                         Gamma.dist(mu=alpha_sj[:, j, np.newaxis],
+                                    sd=alpha_sd_sj[:, j, np.newaxis]).logp(alpha_js[j, :, np.newaxis] + eps)
                          for j in range(num_contigs)]
-            return tt.stack([tt.sum(log_ploidy_state_priors_i_k[i][np.newaxis, :] + \
-                                    pm.logsumexp(tt.log(pi_i_sk[i] + eps) + logp_j_sk[contig_to_index_map[contig]], axis=1))
-                             for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
+            return tt.sum([pm.logsumexp(tt.log(pi_i_sk[i] + eps) +
+                                        tt.sum([logp_j_sk[contig_to_index_map[contig]]
+                                                for contig in contig_tuple], axis=0),
+                                        axis=1)
+                           for i, contig_tuple in enumerate(contig_tuples) ])
+            # return tt.sum([log_ploidy_state_priors_i_k[i][np.newaxis, :] + \
+            #                  tt.sum([pm.logsumexp(tt.log(pi_i_sk[i] + eps) + logp_j_sk[contig_to_index_map[contig]], axis=1)
+            #                          for contig in contig_tuple], axis=0)
+            #                  for i, contig_tuple in enumerate(contig_tuples)])
+            # return tt.sum([tt.sum(log_ploidy_state_priors_i_k[i][np.newaxis, :] + \
+            #                         pm.logsumexp(tt.log(pi_i_sk[i] + eps) + logp_j_sk[contig_to_index_map[contig]], axis=1))
+            #                  for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
         DensityDist(name='logp', logp=logp, observed=[self.ploidy_workspace.fit_mu_sj,
                                                       self.ploidy_workspace.fit_mu_sd_sj,
