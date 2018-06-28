@@ -302,28 +302,9 @@ class PloidyWorkspace:
         alpha_max = 1e5
         num_advi_iterations = 10000
         random_seed = 1
-        learning_rate = 0.1
+        learning_rate = 0.05
         abs_tolerance = 0.5
         num_logq_samples = 10000
-
-        def bound(logp, *conditions, **kwargs):
-            broadcast_conditions = kwargs.get('broadcast_conditions', True)
-            if broadcast_conditions:
-                alltrue = pm_dist_math.alltrue_elemwise
-            else:
-                alltrue = pm_dist_math.alltrue_scalar
-            return tt.switch(alltrue(conditions), logp, 0)
-
-        def negative_binomial_logp(mu, alpha, value, mask=True):
-            return bound(pm_dist_math.binomln(value + alpha - 1, value)
-                         + pm_dist_math.logpow(mu / (mu + alpha), value)
-                         + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
-                         mu > 0, value >= 0, alpha > 0, mask)
-
-        def poisson_logp(mu, value, mask=True):
-            log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu >= 0, value >= 0, mask)
-            # Return zero when mu and value are both zero
-            return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)
 
         num_samples = hist_sjm.shape[0]
         num_contigs = hist_sjm.shape[1]
@@ -440,17 +421,17 @@ class PloidyModel(GeneralizedContinuousModel):
                                 shape=(num_contigs, num_samples))
         register_as_sample_specific(error_rate_js, sample_axis=1)
 
-        mu_j_sk = [pm.Deterministic('mu_%d_sk' % j,
-                                    var=d_s.dimshuffle(0, 'x') * b_j_norm[j] * \
-                                        (tt.maximum(ploidy_j_k[j][np.newaxis, :] + f_js[j].dimshuffle(0, 'x') * (ploidy_j_k[j][np.newaxis, :] > 0),
-                                                    error_rate_js[j][:, np.newaxis])))
+        mu_j_sk = [Deterministic('mu_%d_sk' % j,
+                                 var=d_s.dimshuffle(0, 'x') * b_j_norm[j] * \
+                                     (tt.maximum(ploidy_j_k[j][np.newaxis, :] + f_js[j].dimshuffle(0, 'x') * (ploidy_j_k[j][np.newaxis, :] > 0),
+                                                 error_rate_js[j][:, np.newaxis])))
                    for j in range(num_contigs)]
 
         psi_js = Exponential(name='psi_js',
                              lam=1.0 / psi_scale,
                              shape=(num_contigs, num_samples))
         register_as_sample_specific(psi_js, sample_axis=1)
-        alpha_js = pm.Deterministic('alpha_js', tt.inv((tt.exp(psi_js) - 1.0 + eps)))
+        alpha_js = Deterministic('alpha_js', tt.inv((tt.exp(psi_js) - 1.0 + eps)))
 
         logp_j_sk = [Gamma.dist(mu=self.ploidy_workspace.fit_mu_sj[:, j, np.newaxis],
                                 sd=self.ploidy_workspace.fit_mu_sd_sj[:, j, np.newaxis]).logp(mu_j_sk[j] + eps) +
@@ -472,11 +453,17 @@ class PloidyModel(GeneralizedContinuousModel):
             #                  for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
 
 
-        pm.Deterministic(name='log_ploidy_emission_sjl',
-                         var=tt.stack([pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[contig_to_index_map[contig]] + eps) +
-                                                    logp_j_sk[contig_to_index_map[contig]][:, :, np.newaxis],
-                                                    axis=1)[:, 0, :]
-                                       for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]).dimshuffle(1, 0, 2))
+        Deterministic(name='log_ploidy_emission_sjl',
+                      var=tt.stack([pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[contig_to_index_map[contig]] + eps) +
+                                                 # logp_j_sk[contig_to_index_map[contig]][:, :, np.newaxis],
+                                                 tt.sum(hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] *
+                                                        negative_binomial_logp(mu=mu_j_sk[contig_to_index_map[contig]][:, :, np.newaxis] + eps,
+                                                                               alpha=alpha_js[contig_to_index_map[contig], :, np.newaxis, np.newaxis],
+                                                                               value=counts_m[np.newaxis, np.newaxis, :],
+                                                                               mask=hist_mask_sjm[:, contig_to_index_map[contig], np.newaxis, :]),
+                                                        axis=-1)[:, :, np.newaxis],
+                                                 axis=1)[:, 0, :]
+                                    for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple]).dimshuffle(1, 0, 2))
 
 
 class PloidyEmissionBasicSampler:
@@ -537,3 +524,22 @@ class PloidyBasicCaller:
 
     def call(self) -> np.ndarray:
         return self._update_log_q_ploidy_sjl_theano_func()
+
+def bound(logp, *conditions, **kwargs):
+    broadcast_conditions = kwargs.get('broadcast_conditions', True)
+    if broadcast_conditions:
+        alltrue = pm_dist_math.alltrue_elemwise
+    else:
+        alltrue = pm_dist_math.alltrue_scalar
+    return tt.switch(alltrue(conditions), logp, 0)
+
+def negative_binomial_logp(mu, alpha, value, mask=True):
+    return bound(pm_dist_math.binomln(value + alpha - 1, value)
+                 + pm_dist_math.logpow(mu / (mu + alpha), value)
+                 + pm_dist_math.logpow(alpha / (mu + alpha), alpha),
+                 mu > 0, value >= 0, alpha > 0, mask)
+
+def poisson_logp(mu, value, mask=True):
+    log_prob = bound(pm_dist_math.logpow(mu, value) - mu, mu >= 0, value >= 0, mask)
+    # Return zero when mu and value are both zero
+    return tt.switch(tt.eq(mu, 0) * tt.eq(value, 0), 0, log_prob)

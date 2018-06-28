@@ -137,7 +137,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             print('sample_{0}:'.format(s), np.argmax(q_ploidy_jl, axis=1))
         for s in range(self.ploidy_workspace.num_samples):
             l_j = np.argmax(q_ploidy_sjl[s], axis=1)
-            fig, axarr = plt.subplots(5, 1, figsize=(20, 8))
+            fig, axarr = plt.subplots(5, 1, figsize=(12, 12), gridspec_kw = {'height_ratios':[4, 1, 1, 1, 1]})
             for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples):
                 for contig in contig_tuple:
                     j = self.ploidy_workspace.contig_to_index_map[contig]
@@ -148,7 +148,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                     mu = fit_mu_sj[s, j]
                     alpha = fit_alpha_sj[s, j]
                     pdf_m = nbinom.pmf(k=counts_m_masked, n=alpha, p=alpha / (mu + alpha))
-                    axarr[0].semilogy(counts_m_masked, pdf_m, c='g', lw=1)
+                    axarr[0].semilogy(counts_m_masked, pdf_m, c='g', lw=2)
                     axarr[0].set_xlim([0, self.ploidy_workspace.num_counts])
                     axarr[0].set_ylim([1 / np.sum(self.ploidy_workspace.hist_sjm_full[s, j]), 2 * np.max(hist_norm_m)])
             axarr[0].set_xlabel('count', size=14)
@@ -169,7 +169,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             axarr[1].set_ylim([0, np.shape(q_ploidy_sjl)[2]])
 
             axarr[2].axhline(1, c='k', ls='dashed')
-            axarr[2].errorbar(j, np.ones(self.ploidy_workspace.num_contigs), yerr=fit_mu_sd_sj[s] / fit_mu_sj[s], c='g', fmt='o', elinewidth=2)
+            axarr[2].errorbar(j, np.ones(self.ploidy_workspace.num_contigs), yerr=fit_mu_sd_sj[s] / fit_mu_sj[s], c='g', fmt='o', elinewidth=2, alpha=0.5)
             axarr[2].scatter(j, mu_j / fit_mu_sj[s], c='r')
             axarr[2].set_xticks(j)
             axarr[2].set_xticklabels(self.ploidy_workspace.contigs)
@@ -177,7 +177,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             axarr[2].set_ylabel('mu fit', size=14)
 
             axarr[3].axhline(1, c='k', ls='dashed')
-            axarr[3].errorbar(j, np.ones(self.ploidy_workspace.num_contigs), yerr=fit_alpha_sd_sj[s] / fit_alpha_sj[s], c='g', fmt='o', elinewidth=2)
+            axarr[3].errorbar(j, np.ones(self.ploidy_workspace.num_contigs), yerr=fit_alpha_sd_sj[s] / fit_alpha_sj[s], c='g', fmt='o', elinewidth=2, alpha=0.5)
             axarr[3].scatter(j, alpha_js[:, s] / fit_alpha_sj[s], c='r')
             axarr[3].set_xticks(j)
             axarr[3].set_xticklabels(self.ploidy_workspace.contigs)
