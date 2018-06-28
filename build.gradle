@@ -625,6 +625,50 @@ task testOnShadowJar(type: Test){
     classpath = files( gatkJar, testDependencyJar, testClassesJar)
 }
 
+task collectBundleIntoDir(type: Copy) {
+    dependsOn shadowJar, sparkJar, 'condaEnvironmentDefinition', 'gatkTabComplete', 'gatkDoc'
+
+    doFirst {
+        assert file("gatk").exists()
+        assert file("README.md").exists()
+        assert file("$docBuildDir/tabCompletion/gatk-completion.sh").exists()
+        assert file("src/main/resources/org/broadinstitute/hellbender/utils/config/GATKConfig.properties").exists()
+    }
+
+    destinationDir file("$buildDir")
+
+    from(shadowJar.archivePath)
+    from(sparkJar.archivePath)
+    from("gatk")
+    from("README.md")
+    from("$docBuildDir/tabCompletion/gatk-completion.sh")
+    from("$docBuildDir/gatkDoc", { into("gatkdoc") })
+
+    from("src/main/resources/org/broadinstitute/hellbender/utils/config/GATKConfig.properties") {
+        rename 'GATKConfig.properties', 'GATKConfig.EXAMPLE.properties'
+    }
+
+    from("$buildDir/$pythonPackageArchiveName")
+    from("$buildDir/$gatkCondaYML")
+    from("$buildDir/$gatkCondaIntelYML")
+    into "$buildDir/bundle-files-collected"
+}
+
+task bundle(type: Zip) {
+    dependsOn collectBundleIntoDir
+
+    baseName = project.name + "-" + project.version
+    destinationDir file("$buildDir")
+    archiveName baseName + ".zip"
+
+    from("$buildDir/bundle-files-collected")
+    into(baseName)
+
+    doLast {
+        logger.lifecycle("Created GATK distribution in ${destinationDir}/${archiveName}")
+    }
+}
+
 jacocoTestReport {
     dependsOn test
 
@@ -714,50 +758,6 @@ task pythonPackageArchive(type: Zip) {
 
     doLast {
         logger.lifecycle("Created GATK Python package archive in ${destinationDir}/${archiveName}")
-    }
-}
-
-task collectBundleIntoDir(type: Copy) {
-    dependsOn shadowJar, pythonPackageArchive, sparkJar, 'condaEnvironmentDefinition', 'gatkTabComplete', 'gatkDoc'
-
-    doFirst {
-        assert file("gatk").exists()
-        assert file("README.md").exists()
-        assert file("$docBuildDir/tabCompletion/gatk-completion.sh").exists()
-        assert file("src/main/resources/org/broadinstitute/hellbender/utils/config/GATKConfig.properties").exists()
-    }
-
-    destinationDir file("$buildDir")
-
-    from(shadowJar.archivePath)
-    from(sparkJar.archivePath)
-    from("gatk")
-    from("README.md")
-    from("$docBuildDir/tabCompletion/gatk-completion.sh")
-    from("$docBuildDir/gatkDoc", { into("gatkdoc") })
-
-    from("src/main/resources/org/broadinstitute/hellbender/utils/config/GATKConfig.properties") {
-        rename 'GATKConfig.properties', 'GATKConfig.EXAMPLE.properties'
-    }
-
-    from("$buildDir/$pythonPackageArchiveName")
-    from("$buildDir/$gatkCondaYML")
-    from("$buildDir/$gatkCondaIntelYML")
-    into "$buildDir/bundle-files-collected"
-}
-
-task bundle(type: Zip) {
-    dependsOn collectBundleIntoDir
-
-    baseName = project.name + "-" + project.version
-    destinationDir file("$buildDir")
-    archiveName baseName + ".zip"
-
-    from("$buildDir/bundle-files-collected")
-    into(baseName)
-
-    doLast {
-        logger.lifecycle("Created GATK distribution in ${destinationDir}/${archiveName}")
     }
 }
 
