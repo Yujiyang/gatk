@@ -376,88 +376,6 @@ tasks.withType(Jar) {
     }
 }
 
-test {
-    outputs.upToDateWhen { false }  //tests will never be "up to date" so you can always rerun them
-    String TEST_VERBOSITY = "$System.env.TEST_VERBOSITY"
-
-    /**
-     * Valid options for TEST_TYPE are:
-     * cloud, integration, unit, spark, python, bucket, funcotatorValidation  : run one of the several disjoint partitions of the test suite
-     * all                                                                    : run all the tests
-     * anything else                                                          : run the non-cloud tests
-     */
-    String TEST_TYPE = "$System.env.TEST_TYPE"
-
-    useTestNG {
-        if (TEST_TYPE == "cloud") {
-            // run only the cloud tests
-            includeGroups 'cloud', 'bucket'
-        } else if (TEST_TYPE == "integration"){
-            include "**/*IntegrationTest.class"
-            excludeGroups "cloud", "bucket", "python", "funcotatorValidation"
-        } else if (TEST_TYPE == "unit") {
-            exclude "**/*IntegrationTest.class"
-            excludeGroups "cloud", "bucket", "python", "funcotatorValidation"
-        } else if (TEST_TYPE == "spark") {
-            includeGroups "spark"
-            excludeGroups "cloud", "bucket", "python", "funcotatorValidation"
-        } else if (TEST_TYPE == "python") {
-            includeGroups "python"
-        } else if (TEST_TYPE == "all"){
-            //include everything
-        } else {
-            excludeGroups "cloud", "bucket", "python", "funcotatorValidation"
-        }
-    }
-
-    systemProperty "samjdk.use_async_io_read_samtools", "false"
-    systemProperty "samjdk.use_async_io_write_samtools", "true"
-    systemProperty "samjdk.use_async_io_write_tribble", "false"
-    systemProperty "samjdk.compression_level", "2"
-    systemProperty "gatk.spark.debug", System.getProperty("gatk.spark.debug")
-
-    environment "SPARK_LOCAL_IP","127.0.0.1"
-
-    // set heap size for the test JVM(s)
-    minHeapSize = "1G"
-    maxHeapSize = "4G"
-
-    if (TEST_VERBOSITY == "minimal") {
-        int count = 0
-        // listen to events in the test execution lifecycle
-
-        beforeTest { descriptor ->
-            count++
-            if( count % 10000 == 0) {
-                logger.lifecycle("Finished "+ Integer.toString(count++) + " tests")
-            }
-        }
-    } else {
-        // show standard out and standard error of the test JVM(s) on the console
-        testLogging.showStandardStreams = true
-        beforeTest { descriptor ->
-            logger.lifecycle("Running Test: " + descriptor)
-        }
-
-        // listen to standard out and standard error of the test JVM(s)
-        onOutput { descriptor, event ->
-            logger.lifecycle("Test: " + descriptor + " produced standard out/err: " + event.message )
-        }
-    }
-
-    testLogging {
-        testLogging {
-            events "skipped", "failed"
-            exceptionFormat = "full"
-        }
-        afterSuite { desc, result ->
-            if (!desc.parent) { // will match the outermost suite
-                println "Results: ${result.resultType} (${result.testCount} tests, ${result.successfulTestCount} successes, ${result.failedTestCount} failures, ${result.skippedTestCount} skipped)"
-            }
-        }
-    }
-}
-
 task wrapper(type: Wrapper) {
     gradleVersion = '3.1'
 }
@@ -479,83 +397,7 @@ tasks.withType(ShadowJar) {
     }
 }
 
-shadowJar {
-    configurations = [project.configurations.runtime]
-    classifier = 'local'
-    mergeServiceFiles('reference.conf')
-    doLast {
-        // Create a symlink to the newly created jar.  The name will be gatk.jar and
-        //  it will be at the same level as the newly created jar.  (overwriting symlink, if it exists)
-        // Please note that this will cause failures in Windows, which does not support symlinks.
-        createGatkSymlinks(destinationDir.toString(), archivePath, "", baseJarName, secondaryBaseJarName)
-    }
-}
-
-task localJar{ dependsOn shadowJar }
-
-task sparkJar(type: ShadowJar) {
-    group = "Shadow"
-    description = "Create a combined jar of project and runtime dependencies that excludes provided spark dependencies"
-    configurations = [project.configurations.sparkConfiguration]
-    classifier = 'spark'
-    doLast {
-        // Create a symlink to the newly created jar.  The name will be gatk.jar and
-        //  it will be at the same level as the newly created jar.  (overwriting symlink, if it exists)
-        // Please note that this will cause failures in Windows, which does not support symlinks.
-        createGatkSymlinks(destinationDir.toString(), archivePath, classifier, baseJarName, secondaryBaseJarName)
-    }
-}
-
-// A jar that only contains the test classes and resources (to be extracted for testing)
-task shadowTestClassJar(type: ShadowJar){
-    group = "Shadow"
-    from sourceSets.test.output
-    classifier = "test"
-}
-
-// A minimal jar that only contains the extra dependencies needed for running the tests
-task shadowTestJar(type: ShadowJar){
-    group = "Shadow"
-    from {
-        (project.configurations.testRuntime - project.configurations.runtime ).collect {
-            it.isDirectory() ? it : it.getName().contains(".jar") ? zipTree(it) : it
-        }
-    }
-    classifier = "testDependencies"
-}
-
-task unpackTestJar(type: Copy){
-    String testClassesJar = "$System.env.TEST_JAR"
-
-    if (testClassesJar != null){
-        from zipTree(testClassesJar)
-        into "testClasses"
-    }
-
-    doFirst {
-        if (testClassesJar == null) {
-            throw new GradleException("Environment variable 'TEST_JAR' not specified")
-        }
-        logger.lifecycle("unpacking test jar: " + testClassesJar)
-    }
-}
-
-task testOnPackagedReleaseJar(type: Test){
-    String testClassesJar = "$System.env.TEST_JAR"
-    String testDependencyJar = "$System.env.TEST_DEPENDENCY_JAR"
-    String gatkJar = "$System.env.GATK_JAR"
-
-    dependsOn unpackTestJar
-
-    doFirst {
-        if (testDependencyJar == null) {
-            throw new GradleException("Environment variable 'TEST_DEPENDENCY_JAR' not specified")
-        }
-        if (gatkJar == null) {
-            throw new GradleException("Environment variable 'GATK_JAR' not specified")
-        }
-    }
-
+tasks.withType(Test) {
     outputs.upToDateWhen { false }  //tests will never be "up to date" so you can always rerun them
     String TEST_VERBOSITY = "$System.env.TEST_VERBOSITY"
 
@@ -633,6 +475,80 @@ task testOnPackagedReleaseJar(type: Test){
             if (!desc.parent) { // will match the outermost suite
                 println "Results: ${result.resultType} (${result.testCount} tests, ${result.successfulTestCount} successes, ${result.failedTestCount} failures, ${result.skippedTestCount} skipped)"
             }
+        }
+    }
+}
+
+shadowJar {
+    configurations = [project.configurations.runtime]
+    classifier = 'local'
+    mergeServiceFiles('reference.conf')
+    doLast {
+        // Create a symlink to the newly created jar.  The name will be gatk.jar and
+        //  it will be at the same level as the newly created jar.  (overwriting symlink, if it exists)
+        // Please note that this will cause failures in Windows, which does not support symlinks.
+        createGatkSymlinks(destinationDir.toString(), archivePath, "", baseJarName, secondaryBaseJarName)
+    }
+}
+
+task localJar{ dependsOn shadowJar }
+
+task sparkJar(type: ShadowJar) {
+    group = "Shadow"
+    description = "Create a combined jar of project and runtime dependencies that excludes provided spark dependencies"
+    configurations = [project.configurations.sparkConfiguration]
+    classifier = 'spark'
+    doLast {
+        // Create a symlink to the newly created jar.  The name will be gatk.jar and
+        //  it will be at the same level as the newly created jar.  (overwriting symlink, if it exists)
+        // Please note that this will cause failures in Windows, which does not support symlinks.
+        createGatkSymlinks(destinationDir.toString(), archivePath, classifier, baseJarName, secondaryBaseJarName)
+    }
+}
+
+// A jar that only contains the test classes and resources (to be extracted for testing)
+task testClassJar(type: Jar){
+    group = "Shadow"
+    from sourceSets.test.output
+    classifier = "test"
+}
+
+// A minimal jar that only contains the extra dependencies needed for running the tests
+task shadowTestJar(type: ShadowJar){
+    group = "Shadow"
+    from {
+        (project.configurations.testRuntime - project.configurations.runtime ).collect {
+            it.isDirectory() ? it : it.getName().endsWith(".jar") ? zipTree(it) : it
+        }
+    }
+    classifier = "testDependencies"
+}
+
+task unpackTestJar(type: Copy){
+    String testClassesJar = "$System.env.TEST_JAR"
+
+    if (testClassesJar != "null"){
+        from zipTree(testClassesJar)
+        into "testClasses"
+    }
+}
+
+task testOnPackagedReleaseJar(type: Test){
+    String testClassesJar = "$System.env.TEST_JAR"
+    String testDependencyJar = "$System.env.TEST_DEPENDENCY_JAR"
+    String gatkJar = "$System.env.GATK_JAR"
+
+    dependsOn unpackTestJar
+
+    doFirst {
+        if (testDependencyJar == "null") {
+            throw new GradleException("Environment variable 'TEST_DEPENDENCY_JAR' not specified")
+        }
+        if (gatkJar == "null") {
+            throw new GradleException("Environment variable 'GATK_JAR' not specified")
+        }
+        if (testClassesJar == "null") {
+            throw new GradleException("Environment variable 'TEST_JAR' not specified")
         }
     }
 
