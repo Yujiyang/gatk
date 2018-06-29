@@ -554,7 +554,7 @@ task testOnPackagedReleaseJar(type: Test){
         }
         logger.lifecycle("The classpath used for this test:")
         classpath = files( gatkJar, testDependencyJar, testClassesJar)
-        classpath.each( logger.lifecycle(it.toString()))
+        classpath.each( print(it.toString()) )
     }
 
     testClassesDir = file("testClasses")
