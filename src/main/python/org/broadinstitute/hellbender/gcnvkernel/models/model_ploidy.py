@@ -347,14 +347,21 @@ class PloidyWorkspace:
         num_advi_iterations = 10000
         random_seed = 1
         learning_rate = 0.05
-        abs_tolerance = 0.5
+        abs_tolerance = 0.1
         num_logq_samples = 10000
+        batch_size_base = 32
 
         num_samples = hist_sjm.shape[0]
         num_contigs = hist_sjm.shape[1]
         num_counts = hist_sjm.shape[2]
-        counts_m = np.arange(num_counts)
-        num_occurrences_sj = np.sum(hist_sjm * hist_mask_sjm, axis=-1)
+
+        num_occurrences_sj_th = th.shared(np.sum(hist_sjm * hist_mask_sjm, axis=-1))
+        hist_mask_indices = np.where(hist_mask_sjm)
+
+        batch_size = batch_size_base * num_samples
+        hist_mask_indices_batched = pm.Minibatch(np.transpose(hist_mask_indices),
+                                                 batch_size=batch_size,
+                                                 random_seed=random_seed)
 
         with pm.Model() as model:
             fit_mu_sj = Uniform('fit_mu_sj',
@@ -363,14 +370,27 @@ class PloidyWorkspace:
             fit_alpha_sj = Uniform('fit_alpha_sj',
                                    upper=alpha_max,
                                    shape=(num_samples, num_contigs))
-            p_sjm = tt.exp(negative_binomial_logp(mu=fit_mu_sj.dimshuffle(0, 1, 'x') + eps,
-                                                  alpha=fit_alpha_sj.dimshuffle(0, 1, 'x'),
-                                                  value=counts_m[np.newaxis, np.newaxis, :],
-                                                  mask=hist_mask_sjm))
+            # p_sjm = tt.exp(negative_binomial_logp(mu=fit_mu_sj.dimshuffle(0, 1, 'x') + eps,
+            #                                       alpha=fit_alpha_sj.dimshuffle(0, 1, 'x'),
+            #                                       value=counts_m[np.newaxis, np.newaxis, :],
+            #                                       mask=hist_mask_sjm))
+            # def logp(hist_sjm):
+            #     return tt.sum(poisson_logp(mu=num_occurrences_sj[:, :, np.newaxis] * p_sjm + eps,
+            #                                value=hist_sjm,
+            #                                mask=hist_mask_sjm))
             def logp(hist_sjm):
-                return tt.sum(poisson_logp(mu=num_occurrences_sj[:, :, np.newaxis] * p_sjm + eps,
-                                           value=hist_sjm,
-                                           mask=hist_mask_sjm))
+                s = hist_mask_indices_batched[:, 0]
+                j = hist_mask_indices_batched[:, 1]
+                m = hist_mask_indices_batched[:, 2]
+                fit_mu_b = fit_mu_sj[s, j]
+                fit_alpha_b = fit_alpha_sj[s, j]
+                num_occurrences_b = num_occurrences_sj_th[s, j]
+                p_b = tt.exp(negative_binomial_logp(mu=fit_mu_b + eps,
+                                                    alpha=fit_alpha_b,
+                                                    value=m))
+                hist_b = hist_sjm[s, j, m]
+                return tt.sum(poisson_logp(mu=num_occurrences_b * p_b + eps,
+                                           value=hist_b))
             DensityDist(name='logp_hist_sjm', logp=logp, observed=hist_sjm)
 
         approx = pm.fit(n=num_advi_iterations, model=model, random_seed=random_seed,
