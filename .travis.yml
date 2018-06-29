@@ -145,8 +145,9 @@ script:
     echo ${TEST_TYPE};
     sudo mkdir -p build/reports/;
     sudo chmod -R a+w build/reports/;
+    echo $HOME
     ls $HOME
-    ls $HOME/.gradle 
+    ls $HOME/.gradle
     find $HOME/.gradle
     sudo docker run -v $(pwd):/gatkCloneMountPoint -v $(pwd)/testJars:/jars -v $HOME/.gradle:/root/.gradle --rm -e "TEST_VERBOSITY=minimal" -e "TEST_TYPE=${TEST_TYPE}" -t broadinstitute/gatk:${DOCKER_TAG} bash --init-file /gatk/gatkenv.rc /root/run_unit_tests.sh;
   else
