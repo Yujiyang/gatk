@@ -553,11 +553,11 @@ task testOnPackagedReleaseJar(type: Test){
             throw new GradleException("Environment variable 'TEST_JAR' not specified")
         }
         logger.lifecycle("The classpath used for this test:")
+        classpath = files( gatkJar, testDependencyJar, testClassesJar)
         classpath.each( logger.lifecycle(it.toString()))
     }
 
     testClassesDir = file("testClasses")
-    classpath = files( gatkJar, testDependencyJar, testClassesJar)
 }
 
 task collectBundleIntoDir(type: Copy) {
