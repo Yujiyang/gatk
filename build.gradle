@@ -627,14 +627,14 @@ task jacocoTestReportOnPackagedReleaseJar(type: JacocoReport) {
     dependsOn testOnPackagedReleaseJar
     executionData testOnPackagedReleaseJar
 
-    // This must be here to overwrite the project default srcDir
-    sourceSets {
-        jacocoTestReportOnPackagedReleaseJar {
-            java {
-                srcDir sourceFiles
-            }
-        }
-    }
+//    // This must be here to overwrite the project default srcDir
+//    sourceSets {
+//        jacocoTestReportOnPackagedReleaseJar {
+//            java {
+//                srcDir sourceFiles
+//            }
+//        }
+//    }
     jacoco {
         reportsDir = file("$System.env.SOURCE_DIR/build/reports/")
     }
