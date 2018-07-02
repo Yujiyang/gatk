@@ -260,18 +260,19 @@ class PloidyWorkspace:
                       name='log_ploidy_emission_sjl', borrow=config.borrow_numpy)
 
         for s in range(self.num_samples):
-            fig, axarr = plt.subplots(5, 1, figsize=(12, 12), gridspec_kw = {'height_ratios':[4, 1, 1, 1, 1]})
+            fig, axarr = plt.subplots(4, 1, figsize=(12, 12), gridspec_kw = {'height_ratios':[3, 1, 1, 1]})
             for i, contig_tuple in enumerate(self.contig_tuples):
                 for contig in contig_tuple:
                     j = self.contig_to_index_map[contig]
-                    counts_m_masked = self.counts_m[self.hist_mask_sjm[s, j]]
+                    hist_mask_m = np.logical_not(self.hist_mask_sjm[s, j])
+                    counts_m = self.counts_m
                     hist_norm_m = self.hist_sjm_full[s, j] / np.sum(self.hist_sjm_full[s, j] * self.hist_mask_sjm[s, j])
-                    axarr[0].semilogy(hist_norm_m, c='b', alpha=0.25)
-                    axarr[0].semilogy(counts_m_masked, hist_norm_m[counts_m_masked], c='b', alpha=0.5)
+                    axarr[0].semilogy(counts_m, hist_norm_m, c='k', alpha=0.25)
+                    axarr[0].semilogy(counts_m, np.ma.array(hist_norm_m, mask=hist_mask_m), c='b', alpha=0.5)
                     mu = self.fit_mu_sj[s, j]
                     alpha = self.fit_alpha_sj[s, j]
-                    pdf_m = nbinom.pmf(k=counts_m_masked, n=alpha, p=alpha / (mu + alpha))
-                    axarr[0].semilogy(counts_m_masked, pdf_m, c='g', lw=2)
+                    pdf_m = nbinom.pmf(k=counts_m, n=alpha, p=alpha / (mu + alpha))
+                    axarr[0].semilogy(counts_m, np.ma.array(pdf_m, mask=hist_mask_m), c='g', lw=2)
                     axarr[0].set_xlim([0, self.num_counts])
             axarr[0].set_ylim([1 / np.max(np.sum(self.hist_sjm_full[s] * self.hist_mask_sjm[s], axis=-1)), 1E-1])
             axarr[0].set_xlabel('count', size=14)
@@ -289,19 +290,14 @@ class PloidyWorkspace:
             axarr[2].set_xticklabels(self.contigs)
             axarr[2].set_xlabel('contig', size=14)
             axarr[2].set_ylabel('mu fit', size=14)
+            axarr[2].set_ylim([0, 2])
 
-            axarr[3].axhline(1, c='k', ls='dashed')
+            axarr[3].axhline(0, c='k', ls='dashed')
             axarr[3].set_xticks(j)
             axarr[3].set_xticklabels(self.contigs)
             axarr[3].set_xlabel('contig', size=14)
-            axarr[3].set_ylabel('alpha fit', size=14)
-
-            axarr[4].axhline(0, c='k', ls='dashed')
-            axarr[4].set_xticks(j)
-            axarr[4].set_xticklabels(self.contigs)
-            axarr[4].set_xlabel('contig', size=14)
-            axarr[4].set_ylabel('mosaicism', size=14)
-            axarr[4].set_ylim([self.ploidy_config.mosaicism_bias_lower_bound, self.ploidy_config.mosaicism_bias_upper_bound])
+            axarr[3].set_ylabel('mosaicism', size=14)
+            axarr[3].set_ylim([self.ploidy_config.mosaicism_bias_lower_bound, self.ploidy_config.mosaicism_bias_upper_bound])
 
             fig.tight_layout(pad=0.5)
             fig.savefig('/home/slee/working/gatk/test_files/plots/sample_{0}.png'.format(s))
@@ -494,16 +490,8 @@ class PloidyModel(GeneralizedContinuousModel):
                                                  error_rate_js[j][:, np.newaxis])))
                    for j in range(num_contigs)]
 
-        psi_js = Exponential(name='psi_js',
-                             lam=1.0 / psi_scale,
-                             shape=(num_contigs, num_samples))
-        register_as_sample_specific(psi_js, sample_axis=1)
-        alpha_js = Deterministic('alpha_js', tt.inv((tt.exp(psi_js) - 1.0 + eps)))
-
         logp_j_sk = [Gamma.dist(mu=self.ploidy_workspace.fit_mu_sj[:, j, np.newaxis],
-                                sd=self.ploidy_workspace.fit_mu_sd_sj[:, j, np.newaxis]).logp(mu_j_sk[j] + eps) +
-                     Gamma.dist(mu=self.ploidy_workspace.fit_alpha_sj[:, j, np.newaxis],
-                                sd=self.ploidy_workspace.fit_alpha_sd_sj[:, j, np.newaxis]).logp(alpha_js[j, :, np.newaxis] + eps)
+                                sd=self.ploidy_workspace.fit_mu_sd_sj[:, j, np.newaxis]).logp(mu_j_sk[j] + eps)
                      for j in range(num_contigs)]
 
         Potential('logp', tt.sum([pm.logsumexp(tt.log(pi_i_sk[i] + eps) +
@@ -511,21 +499,13 @@ class PloidyModel(GeneralizedContinuousModel):
                                                        for contig in contig_tuple], axis=0),
                                                axis=1)
                                   for i, contig_tuple in enumerate(contig_tuples)]))
-            # return tt.sum([log_ploidy_state_priors_i_k[i][np.newaxis, :] + \
-            #                  tt.sum([pm.logsumexp(tt.log(pi_i_sk[i] + eps) + logp_j_sk[contig_to_index_map[contig]], axis=1)
-            #                          for contig in contig_tuple], axis=0)
-            #                  for i, contig_tuple in enumerate(contig_tuples)])
-            # return tt.sum([tt.sum(log_ploidy_state_priors_i_k[i][np.newaxis, :] + \
-            #                         pm.logsumexp(tt.log(pi_i_sk[i] + eps) + logp_j_sk[contig_to_index_map[contig]], axis=1))
-            #                  for i, contig_tuple in enumerate(contig_tuples) for contig in contig_tuple])
-
 
         Deterministic(name='log_ploidy_emission_sjl',
-                      var=tt.stack([pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[contig_to_index_map[contig]] + eps) +
+                      var=tt.stack([pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[contig_to_index_map[contig]][np.newaxis, :, :] + eps) +
                                                  # logp_j_sk[contig_to_index_map[contig]][:, :, np.newaxis],
                                                  tt.sum(hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] *
                                                         negative_binomial_logp(mu=mu_j_sk[contig_to_index_map[contig]][:, :, np.newaxis] + eps,
-                                                                               alpha=alpha_js[contig_to_index_map[contig], :, np.newaxis, np.newaxis],
+                                                                               alpha=self.ploidy_workspace.fit_alpha_sj[:, contig_to_index_map[contig], np.newaxis, np.newaxis],
                                                                                value=counts_m[np.newaxis, np.newaxis, :],
                                                                                mask=hist_mask_sjm[:, contig_to_index_map[contig], np.newaxis, :]),
                                                         axis=-1)[:, :, np.newaxis],
