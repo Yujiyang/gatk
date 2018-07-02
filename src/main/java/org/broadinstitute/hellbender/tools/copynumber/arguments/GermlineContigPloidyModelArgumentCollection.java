@@ -79,37 +79,6 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
     )
     private double contigBiasScale = 10.;
 
-    @Argument(
-            doc = "Lower bound of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
-            fullName = MOSAICISM_BIAS_LOWER_BOUND_LONG_NAME,
-            optional = true
-    )
-    private double mosaicismBiasLowerBound = -0.9;
-
-    @Argument(
-            doc = "Upper bound of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
-            fullName = MOSAICISM_BIAS_UPPER_BOUND_LONG_NAME,
-            optional = true
-    )
-    private double mosaicismBiasUpperBound = 0.1;
-
-    @Argument(
-            doc = "Standard deviation of the Gaussian prior on the per-sample-and-contig mosaicism bias.",
-            fullName = MOSAICISM_BIAS_SCALE_LONG_NAME,
-            minValue = 0.,
-            optional = true
-    )
-    private double mosaicismBiasScale = 0.05;
-
-    @Argument(
-            doc = "Inverse mean of the exponential prior on the per-sample unexplained variance.",
-            fullName = PSI_SCALE_LONG_NAME,
-            minValue = 0.,
-            optional = true
-    )
-    private double psiScale = 0.01;
-
-
     public List<String> generatePythonArguments(final DetermineGermlineContigPloidy.RunMode runMode) {
         if (runMode == DetermineGermlineContigPloidy.RunMode.COHORT) {
             return Arrays.asList(
@@ -118,11 +87,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
                     String.format("--error_rate_upper_bound=%e", errorRateUpperBound),
                     String.format("--contig_bias_lower_bound=%e", contigBiasLowerBound),
                     String.format("--contig_bias_upper_bound=%e", contigBiasUpperBound),
-                    String.format("--contig_bias_scale=%e", contigBiasScale),
-                    String.format("--mosaicism_bias_lower_bound=%e", mosaicismBiasLowerBound),
-                    String.format("--mosaicism_bias_upper_bound=%e", mosaicismBiasUpperBound),
-                    String.format("--mosaicism_bias_scale=%e", mosaicismBiasScale),
-                    String.format("--psi_scale=%e", psiScale));
+                    String.format("--contig_bias_scale=%e", contigBiasScale));
         }
         return Collections.emptyList();
     }
@@ -140,17 +105,7 @@ public final class GermlineContigPloidyModelArgumentCollection implements Serial
                 "Upper bound of the per-contig bias must be positive.");
         ParamUtils.isPositive(contigBiasScale,
                 "Scale of the per-contig bias must be positive.");
-        ParamUtils.isFinite(mosaicismBiasLowerBound,
-                "Lower bound of the per-sample-and-contig mosaicism bias must be finite.");
-        ParamUtils.isFinite(mosaicismBiasUpperBound,
-                "Upper bound of the per-sample-and-contig mosaicism bias must be finite.");
-        ParamUtils.isPositive(mosaicismBiasScale,
-                "Scale of the per-sample-and-contig mosaicism bias must be positive.");
-        ParamUtils.isPositive(psiScale,
-                "Scale of the per-sample unexplained variance must be positive.");
         Utils.validateArg(contigBiasLowerBound < contigBiasUpperBound,
                 "Lower bound of the per-contig bias must be less than the upper bound.");
-        Utils.validateArg(mosaicismBiasLowerBound < mosaicismBiasUpperBound,
-                "Lower bound of the per-sample-and-contig mosaicism bias must be less than the upper bound.");
     }
 }

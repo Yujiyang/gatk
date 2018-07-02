@@ -32,11 +32,7 @@ class PloidyModelConfig:
                  error_rate_upper_bound: float = 0.1,
                  contig_bias_lower_bound: float = 0.1,
                  contig_bias_upper_bound: float = 2.0,
-                 contig_bias_scale: float = 10.0,
-                 mosaicism_bias_lower_bound: float = -0.5,
-                 mosaicism_bias_upper_bound: float = 0.5,
-                 mosaicism_bias_scale: float = 0.001,
-                 psi_scale: float = 0.001):
+                 contig_bias_scale: float = 10.0):
         """Initializer.
 
         Args:
@@ -51,11 +47,6 @@ class PloidyModelConfig:
             contig_bias_lower_bound: Lower bound of the Gamma prior on the per-contig bias
             contig_bias_upper_bound: Upper bound of the Gamma prior on the per-contig bias
             contig_bias_scale: Scale factor for the Gamma prior on the per-contig bias
-            mosaicism_bias_lower_bound: Lower bound of the Gaussian prior on the per-sample-and-contig mosaicism bias
-            mosaicism_bias_upper_bound: Upper bound of the Gaussian prior on the per-sample-and-contig mosaicism bias
-            mosaicism_bias_scale: Standard deviation of the Gaussian prior on the per-sample-and-contig "
-                                  mosaicism bias
-            psi_scale: Inverse mean of the exponential prior on the per-sample unexplained variance
         """
         assert ploidy_state_priors_map is not None
         self.ploidy_state_priors_map = ploidy_state_priors_map
@@ -65,10 +56,6 @@ class PloidyModelConfig:
         self.contig_bias_lower_bound = contig_bias_lower_bound
         self.contig_bias_upper_bound = contig_bias_upper_bound
         self.contig_bias_scale = contig_bias_scale
-        self.mosaicism_bias_lower_bound = mosaicism_bias_lower_bound
-        self.mosaicism_bias_upper_bound = mosaicism_bias_upper_bound
-        self.mosaicism_bias_scale = mosaicism_bias_scale
-        self.psi_scale = psi_scale
 
     @staticmethod
     def expose_args(args: argparse.ArgumentParser, hide: Set[str] = None):
@@ -129,27 +116,6 @@ class PloidyModelConfig:
                               type=float,
                               help="Scale factor for the Gamma prior on the per-contig bias",
                               default=initializer_params['contig_bias_scale'].default)
-
-        process_and_maybe_add("mosaicism_bias_lower_bound",
-                              type=float,
-                              help="Lower bound of the Gaussian prior on the per-sample-and-contig mosaicism bias",
-                              default=initializer_params['mosaicism_bias_lower_bound'].default)
-
-        process_and_maybe_add("mosaicism_bias_upper_bound",
-                              type=float,
-                              help="Upper bound of the Gaussian prior on the per-sample-and-contig mosaicism bias",
-                              default=initializer_params['mosaicism_bias_upper_bound'].default)
-
-        process_and_maybe_add("mosaicism_bias_scale",
-                              type=float,
-                              help="Standard deviation of the Gaussian prior on the per-sample-and-contig "
-                                   "mosaicism bias",
-                              default=initializer_params['mosaicism_bias_scale'].default)
-
-        process_and_maybe_add("psi_scale",
-                              type=float,
-                              help="Inverse mean of the exponential prior on the per-sample unexplained variance",
-                              default=initializer_params['psi_scale'].default)
 
     @staticmethod
     def from_args_dict(args_dict: Dict):
@@ -244,7 +210,8 @@ class PloidyWorkspace:
             self._fit_negative_binomial(self.hist_sjm_full, self.hist_mask_sjm)
 
         average_ploidy = 2. # TODO
-        self.d_s_testval = np.median(np.sum(self.hist_sjm_full * self.hist_mask_sjm * self.counts_m, axis=-1) / np.sum(self.hist_sjm_full * self.hist_mask_sjm, axis=-1), axis=-1) / average_ploidy
+        self.d_s_testval = np.median(np.sum(self.hist_sjm_full * self.hist_mask_sjm * self.counts_m, axis=-1) /
+                                     np.sum(self.hist_sjm_full * self.hist_mask_sjm, axis=-1), axis=-1) / average_ploidy
 
         self.hist_sjm : types.TensorSharedVariable = \
             th.shared(self.hist_sjm_full, name='hist_sjm', borrow=config.borrow_numpy)
@@ -260,7 +227,7 @@ class PloidyWorkspace:
                       name='log_ploidy_emission_sjl', borrow=config.borrow_numpy)
 
         for s in range(self.num_samples):
-            fig, axarr = plt.subplots(4, 1, figsize=(12, 12), gridspec_kw = {'height_ratios':[3, 1, 1, 1]})
+            fig, axarr = plt.subplots(3, 1, figsize=(12, 10), gridspec_kw = {'height_ratios':[3, 1, 1]})
             for i, contig_tuple in enumerate(self.contig_tuples):
                 for contig in contig_tuple:
                     j = self.contig_to_index_map[contig]
@@ -292,13 +259,6 @@ class PloidyWorkspace:
             axarr[2].set_ylabel('mu fit', size=14)
             axarr[2].set_ylim([0, 2])
 
-            axarr[3].axhline(0, c='k', ls='dashed')
-            axarr[3].set_xticks(j)
-            axarr[3].set_xticklabels(self.contigs)
-            axarr[3].set_xlabel('contig', size=14)
-            axarr[3].set_ylabel('mosaicism', size=14)
-            axarr[3].set_ylim([self.ploidy_config.mosaicism_bias_lower_bound, self.ploidy_config.mosaicism_bias_upper_bound])
-
             fig.tight_layout(pad=0.5)
             fig.savefig('/home/slee/working/gatk/test_files/plots/sample_{0}.png'.format(s))
 
@@ -308,29 +268,6 @@ class PloidyWorkspace:
 
     @staticmethod
     def _construct_mask(hist_sjm):
-        # count_states = np.arange(0, hist_sjm.shape[2])
-        # mode_sj = np.argmax(hist_sjm * (count_states >= 5), axis=2)
-        # mask_sjm = np.full(np.shape(hist_sjm), False)
-        # for s in range(np.shape(hist_sjm)[0]):
-        #     for j in range(np.shape(hist_sjm)[1]):
-        #         min_sj = np.argmin(hist_sjm[s, j, :mode_sj[s, j] + 1])
-        #         if mode_sj[s, j] <= 10:
-        #             mode_sj[s, j] = 0
-        #             cutoff = 0.
-        #         else:
-        #             cutoff = 0.05
-        #         for m in range(mode_sj[s, j], np.shape(hist_sjm)[2]):
-        #             if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
-        #                 if hist_sjm[s, j, m] > 0:
-        #                     mask_sjm[s, j, m] = True
-        #             else:
-        #                 break
-        #         for m in range(mode_sj[s, j], min_sj, -1):
-        #             if hist_sjm[s, j, m] >= cutoff * hist_sjm[s, j, mode_sj[s, j]]:
-        #                 if hist_sjm[s, j, m] > 0:
-        #                     mask_sjm[s, j, m] = True
-        #             else:
-        #                 break
         mask_sjm = np.full(np.shape(hist_sjm), True)
         mask_sjm[hist_sjm < 10] = False
         mask_sjm[:, :, 0] = False
@@ -340,7 +277,7 @@ class PloidyWorkspace:
     def _fit_negative_binomial(hist_sjm, hist_mask_sjm):
         eps = PloidyWorkspace.epsilon
         alpha_max = 1e5
-        num_advi_iterations = 10000
+        num_advi_iterations = 100000
         random_seed = 1
         learning_rate = 0.05
         abs_tolerance = 0.1
@@ -424,10 +361,6 @@ class PloidyModel(GeneralizedContinuousModel):
         contig_bias_lower_bound = ploidy_config.contig_bias_lower_bound
         contig_bias_upper_bound = ploidy_config.contig_bias_upper_bound
         contig_bias_scale = ploidy_config.contig_bias_scale
-        mosaicism_bias_lower_bound = ploidy_config.mosaicism_bias_lower_bound
-        mosaicism_bias_upper_bound = ploidy_config.mosaicism_bias_upper_bound
-        mosaicism_bias_scale = ploidy_config.mosaicism_bias_scale
-        psi_scale = ploidy_config.psi_scale
         contig_tuples = ploidy_workspace.contig_tuples
         num_samples = ploidy_workspace.num_samples
         num_contigs = ploidy_workspace.num_contigs
@@ -459,14 +392,6 @@ class PloidyModel(GeneralizedContinuousModel):
         register_as_global(b_j)
         b_j_norm = Deterministic('b_j_norm', var=b_j / tt.mean(b_j))
 
-        f_js = Bound(Cauchy,
-                     lower=mosaicism_bias_lower_bound,
-                     upper=mosaicism_bias_upper_bound)('f_js',
-                                                       alpha=0.,
-                                                       beta=mosaicism_bias_scale,
-                                                       shape=(num_contigs, num_samples))
-        register_as_sample_specific(f_js, sample_axis=1)
-
         pi_i_sk = []
         for i, contig_tuple in enumerate(contig_tuples):
             if len(ploidy_state_priors_i_k[i]) > 1:
@@ -486,8 +411,7 @@ class PloidyModel(GeneralizedContinuousModel):
 
         mu_j_sk = [Deterministic('mu_%d_sk' % j,
                                  var=d_s.dimshuffle(0, 'x') * b_j_norm[j] * \
-                                     (tt.maximum(ploidy_j_k[j][np.newaxis, :] + f_js[j].dimshuffle(0, 'x') * (ploidy_j_k[j][np.newaxis, :] > 0),
-                                                 error_rate_js[j][:, np.newaxis])))
+                                     (tt.maximum(ploidy_j_k[j][np.newaxis, :], error_rate_js[j][:, np.newaxis])))
                    for j in range(num_contigs)]
 
         logp_j_sk = [Gamma.dist(mu=self.ploidy_workspace.fit_mu_sj[:, j, np.newaxis],
@@ -502,7 +426,6 @@ class PloidyModel(GeneralizedContinuousModel):
 
         Deterministic(name='log_ploidy_emission_sjl',
                       var=tt.stack([pm.logsumexp(tt.log(pi_i_sk[i][:, :, np.newaxis] * is_ploidy_in_ploidy_state_j_kl[contig_to_index_map[contig]][np.newaxis, :, :] + eps) +
-                                                 # logp_j_sk[contig_to_index_map[contig]][:, :, np.newaxis],
                                                  tt.sum(hist_sjm[:, contig_to_index_map[contig], np.newaxis, :] *
                                                         negative_binomial_logp(mu=mu_j_sk[contig_to_index_map[contig]][:, :, np.newaxis] + eps,
                                                                                alpha=self.ploidy_workspace.fit_alpha_sj[:, contig_to_index_map[contig], np.newaxis, np.newaxis],

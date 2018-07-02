@@ -44,10 +44,7 @@ gcnvkernel.PloidyModelConfig.expose_args(
         "--error_rate_upper_bound",
         "--contig_bias_lower_bound",
         "--contig_bias_upper_bound",
-        "--contig_bias_scale",
-        "--mosaicism_bias_lower_bound",
-        "--mosaicism_bias_upper_bound",
-        "--mosaicism_bias_scale"
+        "--contig_bias_scale"
     })
 
 # override some inference parameters

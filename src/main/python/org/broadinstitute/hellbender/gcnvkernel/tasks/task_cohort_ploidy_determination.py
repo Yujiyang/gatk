@@ -116,14 +116,12 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
                    for i in range(self.ploidy_workspace.num_contig_tuples)]
         d_s = np.mean(trace['d_s'], axis=0)
         b_j_norm = np.mean(trace['b_j_norm'], axis=0)
-        f_sj = np.transpose(np.mean(trace['f_js'], axis=0))
         mu_j_sk = [np.mean(trace['mu_%d_sk' % j], axis=0)
                    for j in range(self.ploidy_workspace.num_contigs)]
 
         fit_mu_sj = self.ploidy_workspace.fit_mu_sj
         fit_mu_sd_sj = self.ploidy_workspace.fit_mu_sd_sj
         fit_alpha_sj = self.ploidy_workspace.fit_alpha_sj
-        fit_alpha_sd_sj = self.ploidy_workspace.fit_alpha_sd_sj
 
         print("pi_i_sk")
         print(pi_i_sk)
@@ -136,7 +134,7 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             print('sample_{0}:'.format(s), np.argmax(q_ploidy_jl, axis=1))
         for s in range(self.ploidy_workspace.num_samples):
             l_j = np.argmax(q_ploidy_sjl[s], axis=1)
-            fig, axarr = plt.subplots(4, 1, figsize=(12, 12), gridspec_kw = {'height_ratios':[3, 1, 1, 1]})
+            fig, axarr = plt.subplots(3, 1, figsize=(12, 10), gridspec_kw = {'height_ratios':[3, 1, 1]})
             for i, contig_tuple in enumerate(self.ploidy_workspace.contig_tuples):
                 for contig in contig_tuple:
                     j = self.ploidy_workspace.contig_to_index_map[contig]
@@ -176,14 +174,6 @@ class CohortPloidyInferenceTask(HybridInferenceTask):
             axarr[2].set_xlabel('contig', size=14)
             axarr[2].set_ylabel('mu fit', size=14)
             axarr[2].set_ylim([0, 2])
-
-            axarr[3].axhline(0, c='k', ls='dashed')
-            axarr[3].scatter(j, f_sj[s, :], c='r')
-            axarr[3].set_xticks(j)
-            axarr[3].set_xticklabels(self.ploidy_workspace.contigs)
-            axarr[3].set_xlabel('contig', size=14)
-            axarr[3].set_ylabel('mosaicism', size=14)
-            axarr[3].set_ylim([self.ploidy_config.mosaicism_bias_lower_bound, self.ploidy_config.mosaicism_bias_upper_bound])
 
             fig.tight_layout(pad=0.5)
             fig.savefig('/home/slee/working/gatk/test_files/plots/sample_{0}.png'.format(s))

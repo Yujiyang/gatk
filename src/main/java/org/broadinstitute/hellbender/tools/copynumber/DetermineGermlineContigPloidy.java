@@ -271,30 +271,12 @@ public final class DetermineGermlineContigPloidy extends CommandLineProgram {
     protected Object doWork() {
         validateArguments();
 
-        //get sequence dictionary and intervals from the first read-count file to use to validate remaining files
-        //(this first file is read again below, which is slightly inefficient but is probably not worth the extra code)
-        final File firstReadCountFile = inputReadCountFiles.get(0);
-        final SimpleCountCollection firstReadCounts = SimpleCountCollection.read(firstReadCountFile);
-        final SAMSequenceDictionary sequenceDictionary = firstReadCounts.getMetadata().getSequenceDictionary();
-        final LocatableMetadata metadata = new SimpleLocatableMetadata(sequenceDictionary);
-
-        if (intervalArgumentCollection.intervalsSpecified()) {
-            logger.info("Intervals specified...");
-            CopyNumberArgumentValidationUtils.validateIntervalArgumentCollection(intervalArgumentCollection);
-            specifiedIntervals = new SimpleIntervalCollection(metadata,
-                    intervalArgumentCollection.getIntervals(sequenceDictionary));
-        } else {
-            logger.info(String.format("Retrieving intervals from first read-count file (%s)...",
-                    firstReadCountFile));
-            specifiedIntervals = new SimpleIntervalCollection(metadata, firstReadCounts.getIntervals());
-        }
-
         //read in count files and output intervals and contig x count distribution collections to temporary files
         final File intervalsFile = IOUtils.createTempFile("intervals", ".tsv");
         specifiedIntervals.write(intervalsFile);
         final File contigCountDistributionCollectionsDir = IOUtils.createTempDir("contig-count-distribution-collections");
         final List<File> contigCountDistributionCollectionFiles =
-                writeContigCountDistributionCollections(contigCountDistributionCollectionsDir, metadata);
+                writeContigCountDistributionCollections(contigCountDistributionCollectionsDir, specifiedIntervals.getMetadata());
 
         //call python inference code
         final boolean pythonReturnCode = executeDeterminePloidyAndDepthPythonScript(
