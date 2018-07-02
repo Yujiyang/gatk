@@ -7,7 +7,7 @@ import pymc3 as pm
 import theano as th
 import theano.tensor as tt
 import pymc3.distributions.dist_math as pm_dist_math
-from pymc3 import Cauchy, Normal, Deterministic, DensityDist, Dirichlet, Bound, Uniform, NegativeBinomial, Poisson, Gamma, Exponential, Potential
+from pymc3 import Deterministic, Dirichlet, DensityDist, Bound, Uniform, Gamma, Potential
 from typing import List, Dict, Set, Tuple
 from scipy.stats import nbinom
 import matplotlib.pyplot as plt
@@ -277,24 +277,30 @@ class PloidyWorkspace:
     def _fit_negative_binomial(hist_sjm, hist_mask_sjm):
         eps = PloidyWorkspace.epsilon
         alpha_max = 1e5
-        num_advi_iterations = 100000
+        num_advi_iterations = 50000
         random_seed = 1
-        learning_rate = 0.05
+        learning_rate = 0.1
         abs_tolerance = 0.1
-        num_logq_samples = 10000
-        batch_size_base = 32
+        num_logq_samples = 1000
+        batch_size_base = 16
 
         num_samples = hist_sjm.shape[0]
         num_contigs = hist_sjm.shape[1]
         num_counts = hist_sjm.shape[2]
 
-        num_occurrences_sj_th = th.shared(np.sum(hist_sjm * hist_mask_sjm, axis=-1))
-        hist_mask_indices = np.where(hist_mask_sjm)
+        num_occurrences_sj = th.shared(np.sum(hist_sjm * hist_mask_sjm, axis=-1))
 
-        batch_size = batch_size_base * num_samples
-        hist_mask_indices_batched = pm.Minibatch(np.transpose(hist_mask_indices),
-                                                 batch_size=batch_size,
-                                                 random_seed=random_seed)
+        batch_size = batch_size_base
+        counts_m = np.arange(num_counts)
+        counts_m_batched = pm.Minibatch(counts_m, batch_size=batch_size, random_seed=random_seed)
+        hist_sjm_th = th.shared(hist_sjm)
+        hist_mask_sjm_th = th.shared(hist_mask_sjm)
+
+        # batch_size = batch_size_base * num_samples
+        # hist_mask_indices = np.where(hist_mask_sjm)
+        # hist_mask_indices_batched = pm.Minibatch(np.transpose(hist_mask_indices),
+        #                                          batch_size=batch_size,
+        #                                          random_seed=random_seed)
 
         with pm.Model() as model:
             fit_mu_sj = Uniform('fit_mu_sj',
@@ -311,21 +317,29 @@ class PloidyWorkspace:
             #     return tt.sum(poisson_logp(mu=num_occurrences_sj[:, :, np.newaxis] * p_sjm + eps,
             #                                value=hist_sjm,
             #                                mask=hist_mask_sjm))
-            def logp(hist_sjm):
-                s = hist_mask_indices_batched[:, 0]
-                j = hist_mask_indices_batched[:, 1]
-                m = hist_mask_indices_batched[:, 2]
-                fit_mu_b = fit_mu_sj[s, j]
-                fit_alpha_b = fit_alpha_sj[s, j]
-                num_occurrences_b = num_occurrences_sj_th[s, j]
-                p_b = tt.exp(negative_binomial_logp(mu=fit_mu_b + eps,
-                                                    alpha=fit_alpha_b,
-                                                    value=m))
-                hist_b = hist_sjm[s, j, m]
-                return tt.sum(poisson_logp(mu=num_occurrences_b * p_b + eps,
-                                           value=hist_b))
-            DensityDist(name='logp_hist_sjm', logp=logp, observed=hist_sjm)
+            p_sjm = tt.exp(negative_binomial_logp(mu=fit_mu_sj.dimshuffle(0, 1, 'x') + eps,
+                                                  alpha=fit_alpha_sj.dimshuffle(0, 1, 'x'),
+                                                  value=counts_m_batched[np.newaxis, np.newaxis, :],
+                                                  mask=hist_mask_sjm_th[:, :, counts_m_batched]))
+            pm.Potential(name='logp_hist_sjm',
+                         var=tt.sum(poisson_logp(mu=num_occurrences_sj[:, :, np.newaxis] * p_sjm + eps,
+                                                 value=hist_sjm_th[:, :, counts_m_batched],
+                                                 mask=hist_mask_sjm_th[:, :, counts_m_batched])))
+            # def logp(hist_sjm):
+            #     s = hist_mask_indices_batched[:, 0]
+            #     j = hist_mask_indices_batched[:, 1]
+            #     m = hist_mask_indices_batched[:, 2]
+            #     fit_mu_b = fit_mu_sj[s, j]
+            #     fit_alpha_b = fit_alpha_sj[s, j]
+            #     num_occurrences_b = num_occurrences_sj[s, j]
+            #     p_b = tt.exp(negative_binomial_logp(mu=fit_mu_b + eps,
+            #                                         alpha=fit_alpha_b,
+            #                                         value=m))
+            #     hist_b = hist_sjm[s, j, m]
+            #     return tt.sum(poisson_logp(mu=num_occurrences_b * p_b + eps,
+            #                                value=hist_b))
 
+        _logger.info("Fitting count distributions...")
         approx = pm.fit(n=num_advi_iterations, model=model, random_seed=random_seed,
                         obj_optimizer=pm.adamax(learning_rate=learning_rate),
                         callbacks=[pm.callbacks.CheckParametersConvergence(tolerance=abs_tolerance, diff='absolute')])
